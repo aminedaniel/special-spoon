@@ -1,0 +1,100 @@
+ticker,name,sector
+ACLS,Axcelis Technologies,Technology
+AEIS,Advanced Energy Industries,Technology
+AKAM,Akamai Technologies,Technology
+ALAB,Astera Labs,Technology
+ALGM,Allegro MicroSystems,Technology
+ALRM,Alarm.com,Technology
+AMBA,Ambarella,Technology
+AMPL,Amplitude,Technology
+APPN,Appian,Technology
+ASAN,Asana,Technology
+AVPT,AvePoint,Technology
+BAND,Bandwidth,Technology
+BB,BlackBerry,Technology
+BL,BlackLine,Technology
+BMBL,Bumble,Technology
+BOX,Box,Technology
+BRZE,Braze,Technology
+BSY,Bentley Systems,Technology
+CALX,Calix,Technology
+CIEN,Ciena,Technology
+COHR,Coherent,Technology
+CYBR,CyberArk Software,Technology
+DT,Dynatrace,Technology
+EPAM,EPAM Systems,Technology
+FFIV,F5,Technology
+GEN,Gen Digital,Technology
+IOT,Samsara,Technology
+MANH,Manhattan Associates,Technology
+MNDY,monday.com,Technology
+OKTA,Okta,Technology
+PCTY,Paylocity,Technology
+TWLO,Twilio,Technology
+WIX,Wix.com,Technology
+ZM,Zoom Communications,Technology
+CAMT,Camtek,Technology
+CARG,CarGurus,Technology
+CFLT,Confluent,Technology
+COHU,Cohu,Technology
+CRDO,Credo Technology,Technology
+CRTO,Criteo,Technology
+CRUS,Cirrus Logic,Technology
+CWAN,Clearwater Analytics,Technology
+CXM,Sprinklr,Technology
+DBX,Dropbox,Technology
+DGII,Digi International,Technology
+DIOD,Diodes,Technology
+DOCN,DigitalOcean,Technology
+DOMO,Domo,Technology
+DV,DoubleVerify,Technology
+EGHT,8x8,Technology
+ESTC,Elastic,Technology
+EVCM,EverCommerce,Technology
+EXTR,Extreme Networks,Technology
+FIVN,Five9,Technology
+FORM,FormFactor,Technology
+FROG,JFrog,Technology
+FSLY,Fastly,Technology
+GTLB,GitLab,Technology
+IAS,Integral Ad Science,Technology
+ICHR,Ichor Holdings,Technology
+KLIC,Kulicke & Soffa,Technology
+LITE,Lumentum,Technology
+LSCC,Lattice Semiconductor,Technology
+MGNI,Magnite,Technology
+MTSI,MACOM Technology,Technology
+NVMI,Nova,Technology
+NVTS,Navitas Semiconductor,Technology
+OLO,Olo,Technology
+ONTO,Onto Innovation,Technology
+PATH,UiPath,Technology
+PD,PagerDuty,Technology
+PEGA,Pegasystems,Technology
+PI,Impinj,Technology
+PLAB,Photronics,Technology
+POWI,Power Integrations,Technology
+PRGS,Progress Software,Technology
+PUBM,PubMatic,Technology
+QLYS,Qualys,Technology
+RMBS,Rambus,Technology
+RNG,RingCentral,Technology
+RPD,Rapid7,Technology
+S,SentinelOne,Technology
+SEMR,Semrush,Technology
+SITM,SiTime,Technology
+SLAB,Silicon Labs,Technology
+SMTC,Semtech,Technology
+SPSC,SPS Commerce,Technology
+SPT,Sprout Social,Technology
+SYNA,Synaptics,Technology
+TDC,Teradata,Technology
+TENB,Tenable,Technology
+U,Unity Software,Technology
+UCTT,Ultra Clean Holdings,Technology
+VECO,Veeco Instruments,Technology
+VIAV,Viavi Solutions,Technology
+VRNS,Varonis Systems,Technology
+WK,Workiva,Technology
+YELP,Yelp,Technology
+YEXT,Yext,Technology
