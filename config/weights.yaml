@@ -1,0 +1,16 @@
+# Signal category weights for the composite score. Must sum to 1.0.
+weights:
+  fundamentals: 0.30
+  technical: 0.35
+  insider: 0.20
+  congress: 0.15
+
+# Quality gate applied to the universe before scoring.
+thresholds:
+  min_market_cap: 300000000      # $300M — small-cap floor
+  max_market_cap: 10000000000    # $10B — mid-cap ceiling
+  max_pe: 60                     # ignore extreme-multiple names (null P/E allowed)
+
+report:
+  top_n: 20                      # picks shown in the weekly report
+  stage_a_shortlist_size: 100    # names advanced to Stage B (insider/congress fetch)
