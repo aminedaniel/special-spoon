@@ -97,7 +97,10 @@ data source fails soft, but a run with no market data cannot rank anything.
 - **Congressional data lag** — the STOCK Act allows 30–45 days to disclose, so that
   signal reflects trades made weeks earlier. The report footer says so.
 - **Senate/House Stock Watcher availability** — these community datasets have had
-  outages; if unreachable the congress signal contributes nothing (weights renormalize).
+  outages and may no longer be maintained. Staleness is detected (no in-window
+  transactions feed-wide) and the congress signal is marked unavailable rather than
+  scored as zeros; its weight redistributes and the report says so. A maintained
+  free replacement source is an open v2 item.
 - **yfinance is unofficial** — Yahoo can change endpoints; per-ticker failures are
   skipped and counted in the report header.
 - Not investment advice; it's an automated research screen.

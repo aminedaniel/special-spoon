@@ -72,7 +72,13 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
                 "Insider signal skipped: SEC_EDGAR_USER_AGENT not set (see .env.example)"
             )
         activity = congress_trades.fetch_recent_activity(shortlist)
-        category_scores["congress"] = congress_signal.score(activity)
+        if activity is None:
+            notes.append(
+                "Congress signal unavailable: disclosure feeds unreachable or stale "
+                "(no in-window transactions); its weight was redistributed"
+            )
+        else:
+            category_scores["congress"] = congress_signal.score(activity)
 
     # ---- Composite over the shortlist --------------------------------------
     shortlist_scores = {
