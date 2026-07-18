@@ -37,6 +37,8 @@ def make_fundamentals(tickers: list[str] = TICKERS) -> pd.DataFrame:
             "dividendYield": 0.0,
             "returnOnEquity": roe,
             "grossMargins": 0.6,
+            "operatingCashflow": cap * 0.05,
+            "netIncomeToCommon": cap * 0.03,
             "sector": "Technology",
             "shortName": f"{t} Corp",
         }

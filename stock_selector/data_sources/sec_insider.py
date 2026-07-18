@@ -1,154 +1,127 @@
-"""SEC EDGAR insider (Form 4) activity for a shortlist of tickers.
-
-Tickers are resolved to issuer CIKs via the official company_tickers.json
-map, and Form 4 counts come from each issuer's own submissions feed
-(data.sec.gov) — never from full-text search, which would match unrelated
+"""Insider (Form 4) activity from SEC EDGAR, scoped to each issuer's own
+submissions feed — never full-text search, which would match unrelated
 filings for short/common tickers like 'S' or 'U'.
 
-Respects SEC fair-access policy: descriptive User-Agent required, requests
-throttled well below the 10 req/s limit.
+Two consumers:
+- the weekly run wants net open-market dollars in a trailing window;
+- the backtest wants the full dated history so it can window any as-of date.
+Both share `fetch_form4_history`, which parses each Form 4 XML exactly once.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta
 
-import requests
+from .edgar import EdgarClient
 
 log = logging.getLogger(__name__)
 
-COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
-FILING_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{doc}"
-REQUEST_PAUSE_SECS = 0.15  # ~6 req/s, under SEC's 10 req/s cap
 LOOKBACK_DAYS = 14
-MAX_FILINGS_PER_TICKER = 10  # bounds per-ticker request volume
+MAX_FILINGS_PER_TICKER = 10   # weekly-run bound
+MAX_HISTORY_FILINGS = 80      # backtest bound (years of Form 4s for a small cap)
 
 
-class EdgarClient:
-    def __init__(self, user_agent: str):
-        if not user_agent:
-            raise ValueError(
-                "SEC_EDGAR_USER_AGENT is required (SEC fair-access policy); "
-                "set it in .env, e.g. 'special-spoon you@example.com'"
-            )
-        self.session = requests.Session()
-        self.session.headers["User-Agent"] = user_agent
-        self._cik_map: dict[str, int] | None = None
-
-    def _get_json(self, url: str) -> dict:
+def parse_form4(xml_text: str) -> tuple[float, float]:
+    """Net (buy_dollars, sell_dollars) from a Form 4's open-market
+    transactions — code P (purchase) and S (sale) only, ignoring awards,
+    option exercises, tax withholding, and gifts."""
+    buy = sell = 0.0
+    root = ET.fromstring(xml_text)
+    for tx in root.iter("nonDerivativeTransaction"):
+        code = tx.findtext("transactionCoding/transactionCode")
+        if code not in ("P", "S"):
+            continue
+        shares = tx.findtext("transactionAmounts/transactionShares/value")
+        price = tx.findtext("transactionAmounts/transactionPricePerShare/value")
         try:
-            resp = self.session.get(url, timeout=30)
-            resp.raise_for_status()
-            return resp.json()
-        finally:
-            time.sleep(REQUEST_PAUSE_SECS)
+            dollars = float(shares) * float(price)
+        except (TypeError, ValueError):
+            continue
+        if code == "P":
+            buy += dollars
+        else:
+            sell += dollars
+    return buy, sell
 
-    def cik_for(self, ticker: str) -> int | None:
-        """Resolve a ticker to its issuer CIK (cached for the run)."""
-        if self._cik_map is None:
-            try:
-                raw = self._get_json(COMPANY_TICKERS_URL)
-                self._cik_map = {
-                    entry["ticker"].upper(): int(entry["cik_str"])
-                    for entry in raw.values()
-                }
-            except Exception as exc:  # noqa: BLE001 — map failure disables the signal
-                log.warning("EDGAR ticker->CIK map fetch failed: %s", exc)
-                self._cik_map = {}
-        return self._cik_map.get(ticker.upper())
 
-    def _recent_form4_filings(
-        self, cik: int, cutoff: str
-    ) -> list[tuple[str, str]]:
-        """(accessionNumber, primaryDocument) for in-window Form 4 filings."""
-        data = self._get_json(SUBMISSIONS_URL.format(cik=cik))
-        recent = data.get("filings", {}).get("recent", {})
-        rows = zip(
-            recent.get("form", []),
-            recent.get("filingDate", []),
-            recent.get("accessionNumber", []),
-            recent.get("primaryDocument", []),
-        )
-        return [
-            (accession, doc)
-            for form, filed, accession, doc in rows
-            if form == "4" and filed >= cutoff
-        ][:MAX_FILINGS_PER_TICKER]
+def fetch_form4_history(
+    client: EdgarClient,
+    ticker: str,
+    since: date,
+    max_filings: int = MAX_FILINGS_PER_TICKER,
+) -> list[tuple[date, float]] | None:
+    """[(filing_date, net_dollars)] for the issuer's Form 4s since `since`,
+    newest first. None when the ticker can't be resolved or EDGAR fails.
+    A filing whose XML can't be fetched/parsed contributes zero dollars."""
+    cik = client.cik_for(ticker)
+    if cik is None:
+        log.info("no CIK found for %s; insider signal unavailable", ticker)
+        return None
+    try:
+        filings = client.recent_filings(cik)
+    except Exception as exc:  # noqa: BLE001 — per-ticker failures are non-fatal
+        log.warning("EDGAR submissions fetch failed for %s: %s", ticker, exc)
+        return None
 
-    def _parse_form4(self, xml_text: str) -> tuple[float, float]:
-        """Net (buy_dollars, sell_dollars) from a Form 4's open-market
-        transactions — code P (purchase) and S (sale) only, ignoring awards,
-        option exercises, tax withholding, and gifts."""
-        buy = sell = 0.0
-        root = ET.fromstring(xml_text)
-        for tx in root.iter("nonDerivativeTransaction"):
-            code = tx.findtext("transactionCoding/transactionCode")
-            if code not in ("P", "S"):
-                continue
-            shares = tx.findtext(
-                "transactionAmounts/transactionShares/value"
-            )
-            price = tx.findtext(
-                "transactionAmounts/transactionPricePerShare/value"
-            )
-            try:
-                dollars = float(shares) * float(price)
-            except (TypeError, ValueError):
-                continue
-            if code == "P":
-                buy += dollars
-            else:
-                sell += dollars
-        return buy, sell
+    cutoff = since.isoformat()
+    form4s = [
+        f
+        for f in filings
+        if f["form"] == "4" and f["filingDate"] >= cutoff
+    ][:max_filings]
 
-    def recent_form4_activity(
-        self, ticker: str, lookback_days: int = LOOKBACK_DAYS
-    ) -> dict | None:
-        """Insider activity for the issuer in the lookback window.
-
-        Returns {"net_dollars": buys - sells, "filings": n} from open-market
-        transactions in the issuer's Form 4s, or None when the ticker can't
-        be resolved / fetches fail (caller treats as 'no information').
-        A filing whose XML can't be fetched or parsed still counts toward
-        `filings` but contributes no dollars.
-        """
-        cik = self.cik_for(ticker)
-        if cik is None:
-            log.info("no CIK found for %s; insider signal unavailable", ticker)
-            return None
-        cutoff = (date.today() - timedelta(days=lookback_days)).isoformat()
-        try:
-            filings = self._recent_form4_filings(cik, cutoff)
-        except Exception as exc:  # noqa: BLE001 — per-ticker failures are non-fatal
-            log.warning("EDGAR submissions fetch failed for %s: %s", ticker, exc)
-            return None
-
+    out: list[tuple[date, float]] = []
+    for f in form4s:
         net = 0.0
-        for accession, doc in filings:
-            if not doc.endswith(".xml"):
-                continue
-            url = FILING_URL.format(
-                cik=cik, accession=accession.replace("-", ""), doc=doc
-            )
+        if f["primaryDocument"].endswith(".xml"):
             try:
-                resp = self.session.get(url, timeout=30)
-                resp.raise_for_status()
-                buy, sell = self._parse_form4(resp.text)
-                net += buy - sell
+                xml_text = client.filing_text(
+                    cik, f["accessionNumber"], f["primaryDocument"]
+                )
+                buy, sell = parse_form4(xml_text)
+                net = buy - sell
             except Exception as exc:  # noqa: BLE001 — skip unparseable filings
-                log.debug("Form 4 parse failed for %s %s: %s", ticker, accession, exc)
-            finally:
-                time.sleep(REQUEST_PAUSE_SECS)
-        return {"net_dollars": net, "filings": len(filings)}
+                log.debug(
+                    "Form 4 parse failed for %s %s: %s",
+                    ticker,
+                    f["accessionNumber"],
+                    exc,
+                )
+        out.append((date.fromisoformat(f["filingDate"]), net))
+    return out
+
+
+def window_activity(
+    history: list[tuple[date, float]] | None, as_of: date, lookback_days: int
+) -> dict | None:
+    """Aggregate a Form 4 history into {net_dollars, filings} for the window
+    (as_of - lookback, as_of]. None history stays None (no information)."""
+    if history is None:
+        return None
+    start = as_of - timedelta(days=lookback_days)
+    in_window = [(d, net) for d, net in history if start < d <= as_of]
+    return {
+        "net_dollars": sum(net for _, net in in_window),
+        "filings": len(in_window),
+    }
 
 
 def fetch_form4_activity(
-    tickers: list[str], user_agent: str, lookback_days: int = LOOKBACK_DAYS
+    tickers: list[str],
+    user_agent: str | None = None,
+    lookback_days: int = LOOKBACK_DAYS,
+    client: EdgarClient | None = None,
 ) -> dict[str, dict | None]:
-    client = EdgarClient(user_agent)
+    """Weekly-run entrypoint: trailing-window activity per shortlist ticker."""
+    client = client or EdgarClient(user_agent or "")
+    today = date.today()
+    since = today - timedelta(days=lookback_days)
     log.info("Fetching Form 4 activity for %d shortlisted tickers", len(tickers))
-    return {t: client.recent_form4_activity(t, lookback_days) for t in tickers}
+    return {
+        t: window_activity(
+            fetch_form4_history(client, t, since), today, lookback_days
+        )
+        for t in tickers
+    }

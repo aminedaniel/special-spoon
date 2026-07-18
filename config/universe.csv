@@ -1,6 +1,8 @@
 ticker,name,sector
 ACLS,Axcelis Technologies,Technology
 AEIS,Advanced Energy Industries,Technology
+AKAM,Akamai Technologies,Technology
+ALAB,Astera Labs,Technology
 ALGM,Allegro MicroSystems,Technology
 ALRM,Alarm.com,Technology
 AMBA,Ambarella,Technology
@@ -14,7 +16,23 @@ BL,BlackLine,Technology
 BMBL,Bumble,Technology
 BOX,Box,Technology
 BRZE,Braze,Technology
+BSY,Bentley Systems,Technology
 CALX,Calix,Technology
+CIEN,Ciena,Technology
+COHR,Coherent,Technology
+CYBR,CyberArk Software,Technology
+DT,Dynatrace,Technology
+EPAM,EPAM Systems,Technology
+FFIV,F5,Technology
+GEN,Gen Digital,Technology
+IOT,Samsara,Technology
+MANH,Manhattan Associates,Technology
+MNDY,monday.com,Technology
+OKTA,Okta,Technology
+PCTY,Paylocity,Technology
+TWLO,Twilio,Technology
+WIX,Wix.com,Technology
+ZM,Zoom Communications,Technology
 CAMT,Camtek,Technology
 CARG,CarGurus,Technology
 CFLT,Confluent,Technology

@@ -10,11 +10,21 @@ from pathlib import Path
 import pandas as pd
 
 from .config import Config
-from .data_sources import congress_trades, macro_fred, market_data, sec_insider
+from .data_sources import (
+    congress_trades,
+    edgar_filings,
+    macro_fred,
+    market_data,
+    sec_insider,
+)
+from .data_sources.edgar import EdgarClient
 from .scoring import apply_quality_gate, composite_score
 from .signals import congress as congress_signal
+from .signals import events as events_signal
+from .signals import filing_text as filing_text_signal
 from .signals import fundamentals as fundamentals_signal
 from .signals import insider as insider_signal
+from .signals import quality as quality_signal
 from .signals import technical as technical_signal
 
 log = logging.getLogger(__name__)
@@ -60,16 +70,24 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
 
     # ---- Stage B: expensive, shortlist only --------------------------------
     if skip_stage_b:
-        notes.append("Stage B (insider/congress) skipped — dry run")
+        notes.append("Stage B (insider/congress/events/filing-text/quality) skipped — dry run")
     else:
         if config.sec_edgar_user_agent:
+            client = EdgarClient(config.sec_edgar_user_agent)
             insider_activity = sec_insider.fetch_form4_activity(
-                shortlist, config.sec_edgar_user_agent
+                shortlist, client=client
             )
             category_scores["insider"] = insider_signal.score(insider_activity)
+            category_scores["events"] = events_signal.score(
+                edgar_filings.fetch_event_points(shortlist, client)
+            )
+            category_scores["filing_text"] = filing_text_signal.score(
+                edgar_filings.fetch_filing_similarity(shortlist, client)
+            )
         else:
             notes.append(
-                "Insider signal skipped: SEC_EDGAR_USER_AGENT not set (see .env.example)"
+                "Insider/events/filing-text signals skipped: SEC_EDGAR_USER_AGENT "
+                "not set (see .env.example)"
             )
         activity = congress_trades.fetch_recent_activity(shortlist)
         if activity is None:
@@ -79,6 +97,11 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
             )
         else:
             category_scores["congress"] = congress_signal.score(activity)
+
+        share_change = market_data.fetch_share_change(shortlist)
+        category_scores["quality"] = quality_signal.score(
+            gated.loc[gated.index.intersection(shortlist)], share_change
+        )
 
     # ---- Composite over the shortlist --------------------------------------
     shortlist_scores = {

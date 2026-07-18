@@ -1,14 +1,17 @@
 # Signal category weights for the composite score. Must sum to 1.0.
 weights:
-  fundamentals: 0.30
-  technical: 0.35
-  insider: 0.20
-  congress: 0.15
+  fundamentals: 0.25
+  technical: 0.25
+  insider: 0.15
+  congress: 0.05      # low: free disclosure feeds are unreliable/stale
+  quality: 0.10       # accruals gap + share-count dilution
+  filing_text: 0.10   # 10-Q/10-K language stability ("lazy prices")
+  events: 0.10        # 13D stakes, shelf registrations, 8-K red flags
 
 # Quality gate applied to the universe before scoring.
 thresholds:
   min_market_cap: 300000000      # $300M — small-cap floor
-  max_market_cap: 10000000000    # $10B — mid-cap ceiling
+  max_market_cap: 20000000000    # $20B — mid-cap ceiling
   max_pe: 60                     # ignore extreme-multiple names (null P/E allowed)
 
 report:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild config/universe.csv: small/mid-cap ($300M-$10B) US tech tickers.
+"""Rebuild config/universe.csv: small/mid-cap ($300M-$20B) US tech tickers.
 
 Run occasionally (quarterly is plenty) — the weekly pipeline reads the
 checked-in CSV and never depends on this script, so listing-source hiccups
@@ -30,7 +30,7 @@ NASDAQ_LISTED = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 
 MIN_CAP = 300e6
-MAX_CAP = 10e9
+MAX_CAP = 20e9
 TECH_SECTORS = {"Technology", "Communication Services"}
 PAUSE_EVERY = 25
 PAUSE_SECS = 1.0

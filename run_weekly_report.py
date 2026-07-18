@@ -45,6 +45,10 @@ def main(argv: list[str] | None = None) -> int:
         "--dry-run", action="store_true",
         help="Stage A only: skip insider/congress/FRED calls",
     )
+    parser.add_argument(
+        "--no-adaptive", action="store_true",
+        help="Ignore reports/adaptive_weights.yaml and use base weights",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -53,7 +57,19 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    config = load_config(weights_path=args.weights, universe_path=args.universe)
+    weights_path = args.weights
+    adaptive_path = Path("reports/adaptive_weights.yaml")
+    if (
+        weights_path == DEFAULT_WEIGHTS_PATH
+        and not args.no_adaptive
+        and adaptive_path.exists()
+    ):
+        weights_path = adaptive_path
+        logging.getLogger(__name__).info(
+            "using IC-adapted weights from %s", adaptive_path
+        )
+
+    config = load_config(weights_path=weights_path, universe_path=args.universe)
     top_n = args.top_n or config.top_n
 
     result = run(config, skip_stage_b=args.dry_run)

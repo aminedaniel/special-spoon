@@ -1,15 +1,22 @@
 # special-spoon — weekly stock selector
 
-Screens a universe of **small/mid-cap US tech stocks** ($300M–$10B) weekly and ranks
+Screens a universe of **small/mid-cap US tech stocks** ($300M–$20B) weekly and ranks
 them by a weighted composite of:
 
-| Signal | Weight | Source (all free) |
+| Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.35 | Yahoo Finance via `yfinance` |
-| Fundamentals (P/E, growth, debt, ROE, margins) | 0.30 | Yahoo Finance via `yfinance` |
-| Insider activity (net open-market Form 4 dollars) | 0.20 | SEC EDGAR issuer submissions + Form 4 XML |
-| Congressional trading (disclosed buys − sells) | 0.15 | Senate/House Stock Watcher |
+| Technicals (trend, momentum, RSI, breakout, volume) | 0.25 | Yahoo Finance via `yfinance` |
+| Fundamentals (P/E, growth, debt, ROE, margins) | 0.25 | Yahoo Finance via `yfinance` |
+| Insider activity (net open-market Form 4 dollars) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
+| Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
+| Filing-language stability ("lazy prices") | 0.10 | SEC EDGAR 10-Q/10-K text diff |
+| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.10 | SEC EDGAR submissions feed |
+| Congressional trading (disclosed buys − sells) | 0.05 | Senate/House Stock Watcher |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
+
+Weights are *base* weights: once enough graded history accumulates, the scoreboard
+tilts them toward signals with demonstrated predictive power (see "Adaptive
+reweighting" below).
 
 The macro signal is deliberately **contextual, not weighted** — a market-wide value is
 identical for every ticker and cannot change relative rankings; it renders as a
@@ -71,6 +78,37 @@ vs QQQ and IWM, with per-report alpha and hit rate. Results land in
 `reports/scoreboard.md` / `scoreboard.csv`. Once a few weeks accumulate, this
 is the evidence for tuning `config/weights.yaml`. Run manually with
 `python run_scoreboard.py --reports-dir reports`.
+
+### Adaptive reweighting
+
+The scoreboard also computes each signal's **information coefficient** (IC — the
+rank correlation between the signal's scores and the returns that actually
+followed) per graded report, saved to `reports/signal_ic.csv`. Once at least 6
+graded reports exist, it writes `reports/adaptive_weights.yaml`: base weights
+tilted toward signals with sustained positive IC. Guardrails keep it honest —
+measured IC is shrunk 50% toward zero, the tilt is capped at ±50% of base weight,
+and no signal can fall below 25% of its base weight (a cold streak never kills a
+signal's chance to recover). The next weekly run picks up the adapted weights
+automatically (`--no-adaptive` opts out).
+
+### Backtesting
+
+```bash
+python run_backtest.py --start 2024-07-01 --end 2026-07-01 --step-weeks 4 --top-n 10
+```
+
+Walk-forward simulation: every 4 weeks, score the universe **as of that date**,
+hold the top N to the next rebalance, compare against QQQ/IWM, and record each
+signal's IC. Adaptive reweighting runs walk-forward too (weights at each rebalance
+use only *prior* periods' ICs). Output: `output/backtest_*.md` with cumulative
+performance, per-signal predictive power, and the biggest wins ("gems") and losses.
+
+Only truly point-in-time signals participate: technical, insider, events, and
+(with `--include-filing-text`, document-heavy) filing language. Fundamentals,
+quality, and congress are excluded — free sources only serve *current* snapshots
+for those, and backtesting them with today's data would be lookahead bias.
+Results also carry survivorship bias: today's universe omits delisted names, so
+absolute returns flatter; treat relative signal comparisons as the useful output.
 
 ## Universe
 
