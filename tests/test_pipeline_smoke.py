@@ -53,7 +53,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 
 @patch("stock_selector.pipeline.macro_fred.fetch_regime")
 @patch("stock_selector.pipeline.congress_trades.fetch_recent_activity")
-@patch("stock_selector.pipeline.sec_insider.fetch_form4_counts")
+@patch("stock_selector.pipeline.sec_insider.fetch_form4_activity")
 @patch("stock_selector.pipeline.market_data.fetch_price_history")
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
@@ -61,7 +61,9 @@ def test_full_run_includes_stage_b(
 ):
     mock_fund.return_value = make_fundamentals()
     mock_prices.return_value = make_price_history()
-    mock_form4.return_value = {t: 3 for t in TICKERS[:4]}
+    mock_form4.return_value = {
+        t: {"net_dollars": 50000.0, "filings": 3} for t in TICKERS[:4]
+    }
     mock_congress.return_value = {
         t: {"buys": 2 if t == "AAAA" else 0, "sells": 0} for t in TICKERS[:4]
     }

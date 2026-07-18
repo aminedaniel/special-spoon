@@ -63,10 +63,10 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
         notes.append("Stage B (insider/congress) skipped — dry run")
     else:
         if config.sec_edgar_user_agent:
-            counts = sec_insider.fetch_form4_counts(
+            insider_activity = sec_insider.fetch_form4_activity(
                 shortlist, config.sec_edgar_user_agent
             )
-            category_scores["insider"] = insider_signal.score(counts)
+            category_scores["insider"] = insider_signal.score(insider_activity)
         else:
             notes.append(
                 "Insider signal skipped: SEC_EDGAR_USER_AGENT not set (see .env.example)"

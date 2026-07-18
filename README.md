@@ -7,7 +7,7 @@ them by a weighted composite of:
 |---|---|---|
 | Technicals (trend, momentum, RSI, breakout, volume) | 0.35 | Yahoo Finance via `yfinance` |
 | Fundamentals (P/E, growth, debt, ROE, margins) | 0.30 | Yahoo Finance via `yfinance` |
-| Insider activity (recent Form 4 filings) | 0.20 | SEC EDGAR full-text search |
+| Insider activity (net open-market Form 4 dollars) | 0.20 | SEC EDGAR issuer submissions + Form 4 XML |
 | Congressional trading (disclosed buys − sells) | 0.15 | Senate/House Stock Watcher |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
@@ -62,6 +62,15 @@ still works but skips the insider signal and macro panel.
 
 A weekly Claude Routine then reads the committed report and posts a summary into
 chat shortly after the workflow finishes.
+
+### Performance scoreboard
+
+Each weekly run also grades every past report old enough to matter (≥7 days):
+the equal-weighted return of that week's top picks from report date to now,
+vs QQQ and IWM, with per-report alpha and hit rate. Results land in
+`reports/scoreboard.md` / `scoreboard.csv`. Once a few weeks accumulate, this
+is the evidence for tuning `config/weights.yaml`. Run manually with
+`python run_scoreboard.py --reports-dir reports`.
 
 ## Universe
 

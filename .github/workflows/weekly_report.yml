@@ -23,6 +23,8 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
         run: python run_weekly_report.py --output-dir reports
+      - name: Update scoreboard
+        run: python run_scoreboard.py --reports-dir reports
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
