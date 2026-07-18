@@ -1,0 +1,32 @@
+name: Weekly stock report
+
+on:
+  schedule:
+    - cron: "0 13 * * 1" # Monday 13:00 UTC (9am ET, pre-market)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Generate report
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: python run_weekly_report.py --output-dir reports
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/
+          git diff --cached --quiet || git commit -m "Weekly report $(date -u +%F)"
+          git push

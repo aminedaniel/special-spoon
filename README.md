@@ -48,6 +48,21 @@ python run_weekly_report.py --top-n 10 -v
 
 Tuning lives in `config/weights.yaml` (weights must sum to 1.0, validated at load).
 
+## Weekly automation
+
+Two GitHub Actions workflows:
+
+- `tests.yml` — pytest on every PR and push to main.
+- `weekly_report.yml` — Monday 13:00 UTC: generates the report and commits it to
+  `reports/` on main. Also runnable on demand from the Actions tab (workflow_dispatch).
+
+Add two repository secrets (Settings → Secrets and variables → Actions) for full
+signal coverage: `FRED_API_KEY` and `SEC_EDGAR_USER_AGENT`. Without them the run
+still works but skips the insider signal and macro panel.
+
+A weekly Claude Routine then reads the committed report and posts a summary into
+chat shortly after the workflow finishes.
+
 ## Universe
 
 `config/universe.csv` is a checked-in starter list of small/mid-cap tech names. Market
