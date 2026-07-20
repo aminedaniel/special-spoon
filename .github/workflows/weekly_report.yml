@@ -2,7 +2,11 @@ name: Weekly stock report
 
 on:
   schedule:
-    - cron: "0 13 * * 1" # Monday 13:00 UTC (9am ET, pre-market)
+    # Monday 11:37 UTC (7:37am ET, pre-market). Off-peak minute: GitHub queues
+    # top-of-hour schedules and can delay them by hours; today's 13:00 run
+    # started at 15:16. The chat-summary Routine fires at 16:00 UTC to allow
+    # for remaining delay.
+    - cron: "37 11 * * 1"
   workflow_dispatch: {}
 
 permissions:
