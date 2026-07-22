@@ -16,13 +16,14 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.25,
-            "technical": 0.25,
+            "fundamentals": 0.23,
+            "technical": 0.23,
             "insider": 0.15,
             "congress": 0.05,
             "quality": 0.10,
-            "filing_text": 0.10,
-            "events": 0.10,
+            "filing_text": 0.08,
+            "events": 0.09,
+            "trends": 0.07,
         },
         thresholds={"min_market_cap": 1e8, "max_market_cap": 20e9, "max_pe": 60},
         top_n=3,
@@ -54,6 +55,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
     assert list(result.rankings["rank"]) == [1, 2, 3, 4]
 
 
+@patch("stock_selector.pipeline.google_trends.fetch_interest_momentum")
 @patch("stock_selector.pipeline.market_data.fetch_share_change")
 @patch("stock_selector.pipeline.edgar_filings.fetch_filing_similarity")
 @patch("stock_selector.pipeline.edgar_filings.fetch_event_points")
@@ -64,7 +66,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
     mock_fund, mock_prices, mock_form4, mock_congress, mock_regime,
-    mock_events, mock_sim, mock_shares, tmp_path
+    mock_events, mock_sim, mock_shares, mock_trends, tmp_path
 ):
     import pandas as pd
 
@@ -80,6 +82,7 @@ def test_full_run_includes_stage_b(
     mock_events.return_value = {t: (2.0 if t == "BBBB" else 0.0) for t in TICKERS[:4]}
     mock_sim.return_value = {t: 0.9 for t in TICKERS[:4]}
     mock_shares.return_value = pd.Series({t: 0.02 for t in TICKERS[:4]})
+    mock_trends.return_value = {t: (1.2 if t == "CCCC" else 0.0) for t in TICKERS[:4]}
 
     result = run(_config(), skip_stage_b=False)
 
@@ -88,8 +91,11 @@ def test_full_run_includes_stage_b(
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
     assert "score_quality" in result.rankings.columns
+    assert "score_trends" in result.rankings.columns
     events = result.rankings["score_events"]
     assert events["BBBB"] == events.max()  # the 13D holder ranks top on events
+    trends = result.rankings["score_trends"]
+    assert trends["CCCC"] == trends.max()  # the search-spike name ranks top on trends
     assert result.regime["label"] == "neutral"
     # congress signal favors the ticker with disclosed buys
     congress = result.rankings["score_congress"]
