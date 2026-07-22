@@ -5,12 +5,13 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.25 | Yahoo Finance via `yfinance` |
-| Fundamentals (P/E, growth, debt, ROE, margins) | 0.25 | Yahoo Finance via `yfinance` |
+| Technicals (trend, momentum, RSI, breakout, volume) | 0.23 | Yahoo Finance via `yfinance` |
+| Fundamentals (P/E, growth, debt, ROE, margins) | 0.23 | Yahoo Finance via `yfinance` |
 | Insider activity (net open-market Form 4 dollars) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
 | Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
-| Filing-language stability ("lazy prices") | 0.10 | SEC EDGAR 10-Q/10-K text diff |
-| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.10 | SEC EDGAR submissions feed |
+| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
+| Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
+| Search-interest momentum (retail attention) | 0.07 | Google Trends via `pytrends` |
 | Congressional trading (disclosed buys − sells) | 0.05 | Senate/House Stock Watcher |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
@@ -154,6 +155,21 @@ data source fails soft, but a run with no market data cannot rank anything.
 
 ## v2 backlog
 
-Reddit/Google-Trends sentiment, FINRA short interest, BLS/FRED hiring & supply-cost
-overlays, HTML report, LLM-written per-pick narratives, response caching, weight
-backtesting. Per-ticker options flow is excluded — no viable free source.
+Reddit sentiment (OAuth app + VADER/ticker-disambiguation), FINRA short interest,
+BLS/FRED hiring & supply-cost overlays, HTML report, LLM-written per-pick narratives,
+response caching. Per-ticker options flow is excluded — no viable free source.
+Google Trends search-interest momentum is now **implemented** as a scored signal.
+
+### Search-interest momentum (Google Trends)
+
+Free, no auth. For each shortlisted ticker it pulls Google Trends interest for
+`"<ticker> stock"` and scores **recent-vs-baseline momentum** (last ~14 days vs the
+trailing ~90). Momentum, not raw interest, is used deliberately: Trends normalizes
+every request to its own peak, so raw 0-100 values aren't comparable across tickers —
+a recent/baseline *ratio* is self-normalizing and comparable after ranking. It
+measures retail *attention*, whose predictive sign is unproven, so it carries a small
+base weight (0.07) and the adaptive-reweighting IC tracking decides its real value.
+Google Trends is heavily rate-limited; requests batch 5 tickers at a time and the
+signal fails soft (weight redistributes) if throttled. Because Trends data is
+historical, this signal is backtest-ready — wiring it into the walk-forward loop is
+a follow-up.

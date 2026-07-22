@@ -13,6 +13,7 @@ from .config import Config
 from .data_sources import (
     congress_trades,
     edgar_filings,
+    google_trends,
     macro_fred,
     market_data,
     sec_insider,
@@ -26,6 +27,7 @@ from .signals import fundamentals as fundamentals_signal
 from .signals import insider as insider_signal
 from .signals import quality as quality_signal
 from .signals import technical as technical_signal
+from .signals import trends as trends_signal
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +104,15 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
         category_scores["quality"] = quality_signal.score(
             gated.loc[gated.index.intersection(shortlist)], share_change
         )
+
+        trends_momentum = google_trends.fetch_interest_momentum(shortlist)
+        if any(v is not None for v in trends_momentum.values()):
+            category_scores["trends"] = trends_signal.score(trends_momentum)
+        else:
+            notes.append(
+                "Google Trends signal unavailable: no data returned (likely rate-limited); "
+                "its weight was redistributed"
+            )
 
     # ---- Composite over the shortlist --------------------------------------
     shortlist_scores = {
