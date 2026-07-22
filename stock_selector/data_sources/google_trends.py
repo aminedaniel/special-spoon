@@ -97,6 +97,11 @@ def fetch_interest_momentum(
             continue
         if df is None or df.empty:
             continue
+        # Drop the still-open final bucket: pytrends flags it isPartial, and an
+        # incomplete current-period value would otherwise land in the "recent"
+        # window and be scored as a complete observation.
+        if "isPartial" in df.columns:
+            df = df[~df["isPartial"].astype(bool)]
         for kw in batch:
             if kw in df.columns:
                 out[keyword_for[kw]] = interest_momentum(df[kw], recent_days)
