@@ -20,6 +20,7 @@ a ticker with no data contributes nothing and its weight redistributes.
 from __future__ import annotations
 
 import logging
+import random
 import time
 from datetime import date, timedelta
 
@@ -28,10 +29,14 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 BATCH_SIZE = 5          # Google Trends allows up to 5 keywords per request
-BATCH_PAUSE_SECS = 2.0  # be gentle with the unofficial endpoint
+BATCH_PAUSE_SECS = 8.0  # inter-batch pause; Google Trends throttles aggressively
 RECENT_DAYS = 14        # "now" window
 BASELINE_DAYS = 90      # trailing window the recent period is compared against
 SEARCH_SUFFIX = "stock"  # disambiguates tickers like S / U / DBX toward the equity
+
+MAX_BATCH_RETRIES = 4          # per-batch attempts before giving up on that batch
+RETRY_BACKOFF_BASE_SECS = 15.0  # exponential: 15s, 30s, 60s between retries
+INITIAL_JITTER_MAX_SECS = 5.0   # random start delay to avoid a synchronized burst
 
 
 def interest_momentum(
@@ -66,18 +71,54 @@ def _timeframe(as_of: date | None, baseline_days: int) -> str:
     return f"{start.isoformat()} {as_of.isoformat()}"
 
 
+def _fetch_batch(pytrends, batch: list[str], timeframe: str):
+    """One batch with exponential backoff on throttling. Returns the
+    interest-over-time DataFrame, or None if every attempt failed."""
+    for attempt in range(MAX_BATCH_RETRIES):
+        try:
+            pytrends.build_payload(batch, timeframe=timeframe)
+            return pytrends.interest_over_time()
+        except Exception as exc:  # noqa: BLE001 — throttling/errors are non-fatal
+            if attempt == MAX_BATCH_RETRIES - 1:
+                log.warning(
+                    "Google Trends batch gave up after %d attempts (%s...): %s",
+                    MAX_BATCH_RETRIES,
+                    batch[0],
+                    exc,
+                )
+                return None
+            wait = RETRY_BACKOFF_BASE_SECS * (2 ** attempt) + random.uniform(0, 3)
+            log.info(
+                "Google Trends batch throttled (%s...), retry %d/%d in %.0fs: %s",
+                batch[0],
+                attempt + 1,
+                MAX_BATCH_RETRIES - 1,
+                wait,
+                exc,
+            )
+            time.sleep(wait)
+    return None
+
+
 def fetch_interest_momentum(
     tickers: list[str],
     as_of: date | None = None,
     recent_days: int = RECENT_DAYS,
     baseline_days: int = BASELINE_DAYS,
 ) -> dict[str, float | None]:
-    """Search-interest momentum per ticker. Fails soft per batch."""
+    """Search-interest momentum per ticker. Fails soft per batch, with
+    exponential backoff so transient Google Trends throttling doesn't wipe
+    out the whole signal."""
     from pytrends.request import TrendReq
 
     out: dict[str, float | None] = {t: None for t in tickers}
     try:
-        pytrends = TrendReq(hl="en-US", tz=0)
+        # urllib3-level retries/backoff on the underlying HTTP session, on top
+        # of the per-batch retry loop below (pytrends raises its own error on
+        # a 429, which the outer loop catches).
+        pytrends = TrendReq(
+            hl="en-US", tz=0, timeout=(10, 30), retries=2, backoff_factor=1.0
+        )
     except Exception as exc:  # noqa: BLE001 — no client, no signal
         log.warning("pytrends init failed: %s", exc)
         return out
@@ -86,16 +127,12 @@ def fetch_interest_momentum(
     keyword_for = {f"{t} {SEARCH_SUFFIX}": t for t in tickers}
     keywords = list(keyword_for)
 
+    time.sleep(random.uniform(0, INITIAL_JITTER_MAX_SECS))
     for i in range(0, len(keywords), BATCH_SIZE):
         batch = keywords[i : i + BATCH_SIZE]
-        try:
-            pytrends.build_payload(batch, timeframe=timeframe)
-            df = pytrends.interest_over_time()
-        except Exception as exc:  # noqa: BLE001 — throttling/errors are non-fatal
-            log.warning("Google Trends batch failed (%s...): %s", batch[0], exc)
-            time.sleep(BATCH_PAUSE_SECS)
-            continue
+        df = _fetch_batch(pytrends, batch, timeframe)
         if df is None or df.empty:
+            time.sleep(BATCH_PAUSE_SECS)
             continue
         # Drop the still-open final bucket: pytrends flags it isPartial, and an
         # incomplete current-period value would otherwise land in the "recent"

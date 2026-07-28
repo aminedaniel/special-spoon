@@ -47,6 +47,58 @@ def test_score_keeps_none_as_nan():
     assert np.isnan(s["B"])
 
 
+def _one_ticker_frame(kw: str) -> pd.DataFrame:
+    idx = pd.date_range("2026-04-01", periods=90, freq="D")
+    return pd.DataFrame(
+        {kw: [10.0] * 76 + [20.0] * 14, "isPartial": [False] * 90}, index=idx
+    )
+
+
+def test_fetch_retries_then_succeeds():
+    # First batch attempt raises (simulated 429), second succeeds. The backoff
+    # loop should recover and still return the momentum rather than None.
+    kw = "AAAA stock"
+    frame = _one_ticker_frame(kw)
+    calls = {"n": 0}
+
+    class FlakyTrendReq:
+        def __init__(self, *a, **k):
+            pass
+
+        def build_payload(self, *a, **k):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("429 too many requests")
+
+        def interest_over_time(self):
+            return frame
+
+    with patch.object(google_trends, "time"), patch.object(
+        google_trends.random, "uniform", return_value=0.0
+    ), patch("pytrends.request.TrendReq", FlakyTrendReq):
+        out = fetch_interest_momentum(["AAAA"])
+    assert calls["n"] == 2  # retried once
+    assert out["AAAA"] == pytest.approx(20.0 / 10.0 - 1.0)
+
+
+def test_fetch_gives_up_after_max_retries():
+    class DeadTrendReq:
+        def __init__(self, *a, **k):
+            pass
+
+        def build_payload(self, *a, **k):
+            raise RuntimeError("429 always")
+
+        def interest_over_time(self):  # pragma: no cover - never reached
+            raise AssertionError("should not be called")
+
+    with patch.object(google_trends, "time"), patch.object(
+        google_trends.random, "uniform", return_value=0.0
+    ), patch("pytrends.request.TrendReq", DeadTrendReq):
+        out = fetch_interest_momentum(["AAAA"])
+    assert out["AAAA"] is None  # fails soft
+
+
 def test_fetch_drops_partial_final_bucket():
     # Baseline flat at 10, recent flat at 20, plus a spurious 100 in the still-
     # open final bucket flagged isPartial=True. Dropping it must yield the clean
