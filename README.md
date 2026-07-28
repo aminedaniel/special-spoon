@@ -56,20 +56,24 @@ python run_weekly_report.py --top-n 10 -v
 
 Tuning lives in `config/weights.yaml` (weights must sum to 1.0, validated at load).
 
-## Weekly automation
+## Automation
 
 Two GitHub Actions workflows:
 
 - `tests.yml` — pytest on every PR and push to main.
-- `weekly_report.yml` — Monday 13:00 UTC: generates the report and commits it to
-  `reports/` on main. Also runnable on demand from the Actions tab (workflow_dispatch).
+- `weekly_report.yml` — **weekday** mornings (11:37 UTC, `1-5`): generates the report
+  and commits it to `reports/` on main. Also runnable on demand from the Actions tab
+  (workflow_dispatch). Markets are closed weekends, so no Sat/Sun run.
 
 Add two repository secrets (Settings → Secrets and variables → Actions) for full
 signal coverage: `FRED_API_KEY` and `SEC_EDGAR_USER_AGENT`. Without them the run
-still works but skips the insider signal and macro panel.
+still works but skips the insider/events/filing-text signals and macro panel.
 
-A weekly Claude Routine then reads the committed report and posts a summary into
-chat shortly after the workflow finishes.
+Delivery (Claude Routines, 16:00 UTC): a Monday routine posts the full analyst deep
+dive + insider analysis; a Tue–Fri routine posts the daily screen summary. Most
+signals (fundamentals, quality, filing-text) only change quarterly, so day-to-day the
+ranking moves mainly on technicals and search-interest — the daily screen is a
+refresh, the deep dive stays weekly by design.
 
 ### Performance scoreboard
 

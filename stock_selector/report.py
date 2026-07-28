@@ -35,7 +35,7 @@ def render_markdown(result: PipelineResult, top_n: int, run_date: date) -> str:
     score_cols = [c for c in result.rankings.columns if c.startswith("score_")]
 
     lines = [
-        f"# Weekly Stock Selector — {run_date.isoformat()}",
+        f"# Stock Selector — {run_date.isoformat()}",
         "",
         f"**Market regime:** {result.regime.get('label', 'unavailable')}",
     ]

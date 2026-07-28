@@ -47,7 +47,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 
     assert md_path.exists() and csv_path.exists()
     md = md_path.read_text()
-    assert "# Weekly Stock Selector — 2026-07-17" in md
+    assert "# Stock Selector — 2026-07-17" in md
     assert "Top 3 picks" in md
     assert "not investment advice" in md
     # shortlist capped at stage_a_shortlist_size
