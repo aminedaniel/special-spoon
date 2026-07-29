@@ -34,6 +34,25 @@ def apply_quality_gate(
     return gated
 
 
+def degenerate_categories(category_scores: dict[str, pd.Series]) -> list[str]:
+    """Categories whose score is the same for every ticker that has one.
+
+    A constant column carries no ranking information — percentile-ranking an
+    all-identical input (e.g. every ticker has zero net insider dollars this
+    window) hands everyone the same mid-rank. Adding that to every composite
+    shifts all scores equally and cannot reorder anything, exactly like the
+    market-wide macro scalar the report deliberately keeps unweighted. Left in
+    place it would still *consume* its weight, diluting the categories that do
+    discriminate, so the caller drops it and lets the weight redistribute.
+    """
+    degenerate = []
+    for name, s in category_scores.items():
+        present = s.dropna()
+        if len(present) > 1 and present.nunique() == 1:
+            degenerate.append(name)
+    return degenerate
+
+
 def composite_score(
     category_scores: dict[str, pd.Series], weights: dict[str, float]
 ) -> pd.DataFrame:

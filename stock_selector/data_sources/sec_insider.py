@@ -18,8 +18,14 @@ from .edgar import EdgarClient
 
 log = logging.getLogger(__name__)
 
-LOOKBACK_DAYS = 14
-MAX_FILINGS_PER_TICKER = 10   # weekly-run bound
+# 90 days, not 14. Only open-market codes P/S count (awards, option exercises
+# and tax withholding are excluded as noise), and those are rare enough in
+# small-cap tech that a fortnight leaves *every* ticker at exactly zero — a
+# constant column that ranks nothing. A quarter is also the horizon the
+# insider-buying literature uses, and it matches the "last 60 days" insider
+# review in the weekly deep dive.
+LOOKBACK_DAYS = 90
+MAX_FILINGS_PER_TICKER = 40   # weekly-run bound; a quarter holds more Form 4s
 MAX_HISTORY_FILINGS = 80      # backtest bound (years of Form 4s for a small cap)
 
 
