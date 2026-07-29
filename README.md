@@ -154,6 +154,12 @@ be lookahead bias. Results also carry survivorship bias: today's universe omits
 delisted names, so absolute returns flatter; treat relative signal comparisons
 as the useful output.
 
+Form 4 history is fetched per ticker with a cap that **scales to the window**
+(`--max-form4` overrides). This matters: the fetch keeps the *newest* filings, so a
+cap sized for one year would leave every early rebalance of a multi-year run with no
+in-window insider activity — a constant column that looks like a working signal and
+measures nothing. Small/mid-cap tech issuers file roughly 70–110 Form 4s a year.
+
 Also runnable from the Actions tab (**Backtest** → Run workflow) with start/end,
 step-weeks, top-n, and filing-text as inputs; results are committed to
 `reports/backtests/`. Set the `SEC_EDGAR_USER_AGENT` secret first — without it the

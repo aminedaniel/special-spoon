@@ -148,3 +148,20 @@ def test_run_backtest_produces_periods_ic_and_picks():
     assert "earnings_drift" in result.ic_history.columns
     # weights recorded per period and sum to 1
     assert result.weights_used.sum(axis=1).round(6).eq(1.0).all()
+
+
+def test_form4_cap_scales_with_window():
+    """A cap that only covers recent months would leave early rebalances with
+    no in-window Form 4s at all — a constant insider column that looks like a
+    working signal and measures nothing."""
+    from stock_selector.backtest import form4_cap_for_window
+    from stock_selector.data_sources.sec_insider import MAX_HISTORY_FILINGS
+
+    end = date(2026, 7, 29)
+    two_yr = form4_cap_for_window(date(2024, 7, 29), end)
+    four_yr = form4_cap_for_window(date(2022, 7, 29), end)
+    assert four_yr > two_yr > MAX_HISTORY_FILINGS
+    # ~70-110 filings/yr observed live; the budget must clear that comfortably.
+    assert four_yr >= 4 * 110
+    # Never drops below the single-window default, even for a tiny range.
+    assert form4_cap_for_window(date(2026, 7, 1), end) >= MAX_HISTORY_FILINGS
