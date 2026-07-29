@@ -9,12 +9,13 @@ them by a weighted composite of:
 | Technicals (12-1 momentum, trend, breakout, volume) | 0.10 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.12 | Yahoo Finance via `yfinance` |
 | Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.08 | Yahoo Finance statements via `yfinance` |
-| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.16 | SEC EDGAR issuer submissions + Form 4 XML |
-| Quality (accrual gap, share dilution) | 0.11 | Yahoo Finance financial fields + share history |
+| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
+| Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
+| Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.06 | Yahoo Finance via `yfinance` |
-| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
+| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
-| Search-interest momentum (retail attention) | 0.08 | Google Trends via `pytrends` |
+| Search-interest momentum (retail attention) | 0.05 | Google Trends via `pytrends` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
 Weights are *base* weights: once enough graded history accumulates, the scoreboard
@@ -223,8 +224,9 @@ data source fails soft, but a run with no market data cannot rank anything.
 
 ## v2 backlog
 
-Reddit sentiment (OAuth app + VADER/ticker-disambiguation), FINRA short interest,
-BLS/FRED hiring & supply-cost overlays, HTML report, LLM-written per-pick narratives,
+Reddit sentiment (OAuth app + VADER/ticker-disambiguation),
+BLS/FRED hiring & supply-cost overlays, supply-chain links from 10-K customer
+disclosures (Cohen-Frazzini), HTML report, LLM-written per-pick narratives,
 response caching. Per-ticker options flow is excluded — no viable free source.
 Google Trends search-interest momentum is now **implemented** as a scored signal.
 

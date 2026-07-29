@@ -27,6 +27,7 @@ from .signals import fundamentals as fundamentals_signal
 from .signals import insider as insider_signal
 from .signals import profitability as profitability_signal
 from .signals import quality as quality_signal
+from .signals import short_interest as short_interest_signal
 from .signals import technical as technical_signal
 from .signals import trends as trends_signal
 from .signals import valuation as valuation_signal
@@ -62,6 +63,7 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
     category_scores: dict[str, pd.Series] = {
         "fundamentals": fundamentals_signal.score(gated),
         "valuation": valuation_signal.score(gated),
+        "short_interest": short_interest_signal.score(gated),
         "technical": technical_signal.score(prices).reindex(gated.index),
     }
 
