@@ -19,6 +19,7 @@ from stock_selector.backtest import (
     BENCHMARKS,
     collect_earnings_histories,
     collect_edgar_histories,
+    form4_cap_for_window,
     render_markdown,
     run_backtest,
 )
@@ -42,6 +43,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-adaptive", action="store_true",
         help="Keep base weights fixed instead of walk-forward IC tilting",
+    )
+    parser.add_argument(
+        "--max-form4", type=int, default=None,
+        help="Form 4s fetched per ticker (default: scaled to the window). "
+             "Too low and early rebalances see no insider activity at all.",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -73,9 +79,16 @@ def main(argv: list[str] | None = None) -> int:
     histories = {"form4": {t: None for t in universe}, "filings": {t: None for t in universe}, "text_cache": None}
     if config.sec_edgar_user_agent:
         client = EdgarClient(config.sec_edgar_user_agent)
+        edgar_since = args.start - timedelta(days=180)
+        cap = args.max_form4 or form4_cap_for_window(edgar_since, args.end)
+        client_histories_note = (
+            f"Form 4 cap {cap}/ticker over {(args.end - edgar_since).days} days"
+        )
+        print(f"EDGAR: {client_histories_note}")
         histories = collect_edgar_histories(
-            client, universe, args.start - timedelta(days=180),
+            client, universe, edgar_since,
             include_filing_text=args.include_filing_text,
+            max_form4=cap,
         )
     else:
         print(

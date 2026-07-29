@@ -116,19 +116,34 @@ def stability_scores_asof(
     return stability_signal.score(prices[mask], bench)
 
 
+def form4_cap_for_window(since: date, end: date) -> int:
+    """How many Form 4s per ticker the window actually needs.
+
+    fetch_form4_history keeps the *newest* `max_filings` rows, so a cap that
+    only covers recent months leaves every early rebalance with no in-window
+    activity — a constant insider column that looks like a working signal and
+    measures nothing. Small/mid-cap tech issuers file roughly 70-110 Form 4s a
+    year, so budget 130/year plus slack and let the caller override.
+    """
+    years = max((end - since).days / 365.0, 1.0)
+    return max(sec_insider.MAX_HISTORY_FILINGS, int(130 * years) + 40)
+
+
 def collect_edgar_histories(
     client: EdgarClient,
     tickers: list[str],
     since: date,
     include_filing_text: bool,
+    max_form4: int = sec_insider.MAX_HISTORY_FILINGS,
 ) -> dict:
     """One pass over EDGAR per ticker: Form 4 history (XML parsed once per
     filing) and the submissions rows reused by events/filing-text scoring."""
     form4: dict[str, list | None] = {}
     filings: dict[str, list[dict] | None] = {}
+    log.info("Form 4 cap: %d filings/ticker since %s", max_form4, since)
     for t in tickers:
         form4[t] = sec_insider.fetch_form4_history(
-            client, t, since, max_filings=sec_insider.MAX_HISTORY_FILINGS
+            client, t, since, max_filings=max_form4
         )
         cik = client.cik_for(t)
         if cik is None:
