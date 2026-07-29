@@ -25,6 +25,7 @@ from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import fundamentals as fundamentals_signal
 from .signals import insider as insider_signal
+from .signals import profitability as profitability_signal
 from .signals import quality as quality_signal
 from .signals import technical as technical_signal
 from .signals import trends as trends_signal
@@ -97,6 +98,9 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
         category_scores["quality"] = quality_signal.score(
             gated.loc[gated.index.intersection(shortlist)], share_change
         )
+
+        prof_metrics = market_data.fetch_profitability_metrics(shortlist)
+        category_scores["profitability"] = profitability_signal.score(prof_metrics)
 
         surprises = earnings.fetch_earnings_surprise(shortlist)
         if any(v is not None for v in surprises.values()):

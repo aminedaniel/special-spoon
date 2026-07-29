@@ -16,8 +16,9 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.16,
-            "valuation": 0.10,
+            "fundamentals": 0.12,
+            "valuation": 0.06,
+            "profitability": 0.08,
             "technical": 0.10,
             "earnings_drift": 0.12,
             "insider": 0.16,
@@ -56,6 +57,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
     assert list(result.rankings["rank"]) == [1, 2, 3, 4]
 
 
+@patch("stock_selector.pipeline.market_data.fetch_profitability_metrics")
 @patch("stock_selector.pipeline.earnings.fetch_earnings_surprise")
 @patch("stock_selector.pipeline.google_trends.fetch_interest_momentum")
 @patch("stock_selector.pipeline.market_data.fetch_share_change")
@@ -67,7 +69,8 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
     mock_fund, mock_prices, mock_form4, mock_regime,
-    mock_events, mock_sim, mock_shares, mock_trends, mock_surprise, tmp_path
+    mock_events, mock_sim, mock_shares, mock_trends, mock_surprise,
+    mock_prof, tmp_path
 ):
     import pandas as pd
 
@@ -97,9 +100,17 @@ def test_full_run_includes_stage_b(
         for i, t in enumerate(TICKERS[:4])
     }
 
+    mock_prof.return_value = pd.DataFrame(
+        {
+            t: {"gp_over_assets": 0.5 - 0.1 * i, "asset_growth": 0.05 * i}
+            for i, t in enumerate(TICKERS[:4])
+        }
+    ).T
+
     result = run(_config(), skip_stage_b=False)
 
     assert "score_valuation" in result.rankings.columns
+    assert "score_profitability" in result.rankings.columns
     assert "score_insider" in result.rankings.columns
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns

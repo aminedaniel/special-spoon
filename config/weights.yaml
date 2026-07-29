@@ -1,7 +1,8 @@
 # Signal category weights for the composite score. Must sum to 1.0.
 weights:
-  fundamentals: 0.16     # growth + balance-sheet quality (valuation moved out)
-  valuation: 0.10        # P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF (cheaper = better)
+  fundamentals: 0.12     # growth + balance-sheet quality (valuation moved out)
+  valuation: 0.06        # cheapness predicts poorly in tech; cut to fund profitability
+  profitability: 0.08    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors
   technical: 0.10        # cut from 0.22: backtest measured its IC at +0.016, t=0.33
   earnings_drift: 0.12   # PEAD/SUE — strongest-evidence anomaly; funded from technical
   insider: 0.16          # net open-market Form 4 dollars, trailing 90 days

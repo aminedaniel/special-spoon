@@ -107,3 +107,51 @@ def fetch_share_change(tickers: list[str], lookback_days: int = 365) -> pd.Serie
         if (i + 1) % INFO_BATCH_PAUSE_EVERY == 0:
             time.sleep(INFO_BATCH_PAUSE_SECS)
     return pd.Series(out, dtype="float64")
+
+
+def fetch_profitability_metrics(tickers: list[str]) -> pd.DataFrame:
+    """Balance-sheet factors per ticker: gross profitability and asset growth.
+
+    - gp_over_assets: gross profit / total assets (Novy-Marx 2013, "the other
+      side of value") — the profitability measure that survived replication
+      best, and cleaner than ROE because gross profit sits above the accrual
+      and financing choices that pollute net income.
+    - asset_growth: YoY total-asset growth (Cooper/Gulen/Schill 2008) — high
+      growers underperform; it's the CMA leg of Fama-French five-factor.
+
+    Two extra statement pulls per ticker, so shortlist-only (Stage B). NaN
+    rows where statements are unavailable — the signal treats that as 'no
+    information', never zero.
+    """
+    rows: dict[str, dict] = {}
+    for i, ticker in enumerate(tickers):
+        gp = assets = assets_prev = None
+        try:
+            tk = yf.Ticker(ticker)
+            bs = tk.balance_sheet
+            if bs is not None and not bs.empty and "Total Assets" in bs.index:
+                series = bs.loc["Total Assets"].dropna()
+                if len(series) >= 1:
+                    assets = float(series.iloc[0])
+                if len(series) >= 2:
+                    assets_prev = float(series.iloc[1])
+            inc = tk.income_stmt
+            if inc is not None and not inc.empty and "Gross Profit" in inc.index:
+                gp_series = inc.loc["Gross Profit"].dropna()
+                if len(gp_series) >= 1:
+                    gp = float(gp_series.iloc[0])
+        except Exception as exc:  # noqa: BLE001 — per-ticker failure is non-fatal
+            log.debug("statement fetch failed for %s: %s", ticker, exc)
+        rows[ticker] = {
+            "gp_over_assets": (gp / assets) if gp is not None and assets else None,
+            "asset_growth": (
+                assets / assets_prev - 1.0
+                if assets is not None and assets_prev
+                else None
+            ),
+        }
+        if (i + 1) % INFO_BATCH_PAUSE_EVERY == 0:
+            time.sleep(INFO_BATCH_PAUSE_SECS)
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    df.index.name = "ticker"
+    return df
