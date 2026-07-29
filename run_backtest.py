@@ -92,12 +92,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    md_path = args.output_dir / f"backtest_{args.start}_{args.end}.md"
+    # Date-stamp every artifact so separate runs don't clobber each other.
+    stem = f"backtest_{args.start}_{args.end}"
+    md_path = args.output_dir / f"{stem}.md"
     md_path.write_text(render_markdown(result, args.top_n, args.step_weeks))
-    result.periods.to_csv(args.output_dir / "backtest_periods.csv", index=False)
-    result.picks.to_csv(args.output_dir / "backtest_picks.csv", index=False)
+    result.periods.to_csv(args.output_dir / f"{stem}_periods.csv", index=False)
+    result.picks.to_csv(args.output_dir / f"{stem}_picks.csv", index=False)
     if not result.ic_history.empty:
-        result.ic_history.to_csv(args.output_dir / "backtest_ic.csv")
+        result.ic_history.to_csv(args.output_dir / f"{stem}_ic.csv")
     print(f"Backtest report: {md_path}")
     return 0
 

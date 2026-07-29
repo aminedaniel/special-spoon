@@ -1,0 +1,87 @@
+name: Backtest
+
+# Manual only — walk-forward backtest over point-in-time signals, committing
+# results to reports/backtests/. Use it to get per-signal information
+# coefficients (IC) from history instead of waiting months for live reports
+# to accumulate.
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start date (YYYY-MM-DD)"
+        type: string
+        default: "2024-07-01"
+      end:
+        description: "End date (YYYY-MM-DD). Blank = today."
+        type: string
+        default: ""
+      step_weeks:
+        description: "Weeks between rebalances (4 = monthly)"
+        type: string
+        default: "4"
+      top_n:
+        description: "Picks held each rebalance"
+        type: string
+        default: "10"
+      include_filing_text:
+        description: "Also score 10-Q/10-K language similarity (many more EDGAR document fetches — much slower)"
+        type: boolean
+        default: false
+      no_adaptive:
+        description: "Fix weights instead of walk-forward IC tilting"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    # EDGAR is throttled to ~6 req/s and a 2-year run pulls Form 4 history for
+    # the whole universe, so this is slow by nature.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run backtest
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: |
+          if [ -z "$SEC_EDGAR_USER_AGENT" ]; then
+            echo "::warning::SEC_EDGAR_USER_AGENT is not set — insider, events, and filing-text signals will be skipped. The backtest will measure the technical signal only."
+          fi
+          ARGS="--start ${{ inputs.start }}"
+          ARGS="$ARGS --step-weeks ${{ inputs.step_weeks }}"
+          ARGS="$ARGS --top-n ${{ inputs.top_n }}"
+          ARGS="$ARGS --output-dir reports/backtests"
+          if [ -n "${{ inputs.end }}" ]; then
+            ARGS="$ARGS --end ${{ inputs.end }}"
+          fi
+          if [ "${{ inputs.include_filing_text }}" = "true" ]; then
+            ARGS="$ARGS --include-filing-text"
+          fi
+          if [ "${{ inputs.no_adaptive }}" = "true" ]; then
+            ARGS="$ARGS --no-adaptive"
+          fi
+          echo "Running: python run_backtest.py $ARGS"
+          python run_backtest.py $ARGS -v
+      - name: Show signal ICs in the run log
+        if: always()
+        run: |
+          for f in reports/backtests/*_ic.csv; do
+            [ -e "$f" ] || continue
+            echo "=== $f ==="
+            cat "$f"
+          done
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/backtests/
+          git diff --cached --quiet || git commit -m "Backtest ${{ inputs.start }} (step ${{ inputs.step_weeks }}w, top ${{ inputs.top_n }})"
+          git push
