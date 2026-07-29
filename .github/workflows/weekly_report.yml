@@ -1,12 +1,11 @@
-name: Daily stock report
+name: Weekly stock report
 
 on:
   schedule:
-    # Weekdays 11:37 UTC (7:37am ET, pre-market). Off-peak minute: GitHub queues
-    # top-of-hour schedules and can delay them by hours. Markets are closed
-    # weekends, so no run Sat/Sun. Delivery Routines fire at 16:00 UTC to allow
-    # for remaining schedule delay.
-    - cron: "37 11 * * 1-5"
+    # Monday 11:37 UTC (7:37am ET, pre-market). Off-peak minute: GitHub queues
+    # top-of-hour schedules and can delay them by hours. Delivery Routine fires
+    # at 16:00 UTC to allow for remaining schedule delay.
+    - cron: "37 11 * * 1"
   workflow_dispatch:
     inputs:
       backfill_tracker:
@@ -37,18 +36,13 @@ jobs:
       - name: Backfill recommendation tracker (manual, one-time)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_tracker }}
         run: python run_tracker.py --reports-dir reports --top-n 2 --backfill
-      - name: Update recommendation tracker (Mondays)
+      - name: Update recommendation tracker
         if: ${{ github.event_name == 'schedule' }}
-        run: |
-          if [ "$(date -u +%u)" = "1" ]; then
-            python run_tracker.py --reports-dir reports --top-n 2
-          else
-            echo "Not Monday — skipping weekly tracker update."
-          fi
+        run: python run_tracker.py --reports-dir reports --top-n 2
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/
-          git diff --cached --quiet || git commit -m "Daily report $(date -u +%F)"
+          git diff --cached --quiet || git commit -m "Weekly report $(date -u +%F)"
           git push

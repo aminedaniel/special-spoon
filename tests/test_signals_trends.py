@@ -14,6 +14,20 @@ from stock_selector.data_sources.google_trends import (
 from stock_selector.signals.trends import score
 
 
+class _FakeTime:
+    """Stub for the time module in google_trends: sleep is a no-op, monotonic
+    is real and advancing (so the wall-clock deadline logic still works)."""
+
+    import time as _t
+
+    def sleep(self, _s):
+        return None
+
+    def monotonic(self):
+        return self._t.monotonic()
+
+
+
 def test_momentum_positive_when_recent_elevated():
     # 90 days flat at 10, last 14 days jump to 30 -> strong positive momentum
     series = pd.Series([10.0] * 76 + [30.0] * 14)
@@ -73,7 +87,7 @@ def test_fetch_retries_then_succeeds():
         def interest_over_time(self):
             return frame
 
-    with patch.object(google_trends, "time"), patch.object(
+    with patch.object(google_trends, "time", _FakeTime()), patch.object(
         google_trends.random, "uniform", return_value=0.0
     ), patch("pytrends.request.TrendReq", FlakyTrendReq):
         out = fetch_interest_momentum(["AAAA"])
@@ -92,11 +106,46 @@ def test_fetch_gives_up_after_max_retries():
         def interest_over_time(self):  # pragma: no cover - never reached
             raise AssertionError("should not be called")
 
-    with patch.object(google_trends, "time"), patch.object(
+    with patch.object(google_trends, "time", _FakeTime()), patch.object(
         google_trends.random, "uniform", return_value=0.0
     ), patch("pytrends.request.TrendReq", DeadTrendReq):
         out = fetch_interest_momentum(["AAAA"])
     assert out["AAAA"] is None  # fails soft
+
+
+def test_fetch_respects_time_budget():
+    # A monotonic clock that jumps past the budget makes the loop bail before
+    # fetching, so a hard-throttling run can't hang: ticker stays None, and the
+    # underlying client is never even called.
+    class JumpyTime:
+        def __init__(self):
+            self._t = 0.0
+
+        def sleep(self, _s):
+            return None
+
+        def monotonic(self):
+            self._t += 1000.0  # each call leaps well past MAX_TOTAL_SECONDS
+            return self._t
+
+    called = {"n": 0}
+
+    class TrendReqSpy:
+        def __init__(self, *a, **k):
+            pass
+
+        def build_payload(self, *a, **k):
+            called["n"] += 1
+
+        def interest_over_time(self):  # pragma: no cover
+            return pd.DataFrame()
+
+    with patch.object(google_trends, "time", JumpyTime()), patch.object(
+        google_trends.random, "uniform", return_value=0.0
+    ), patch("pytrends.request.TrendReq", TrendReqSpy):
+        out = fetch_interest_momentum(["AAAA", "BBBB"])
+    assert out == {"AAAA": None, "BBBB": None}
+    assert called["n"] == 0  # budget exhausted before any request
 
 
 def test_fetch_drops_partial_final_bucket():
@@ -119,7 +168,7 @@ def test_fetch_drops_partial_final_bucket():
         def interest_over_time(self):
             return frame
 
-    with patch.object(google_trends, "time"), patch(
+    with patch.object(google_trends, "time", _FakeTime()), patch(
         "pytrends.request.TrendReq", FakeTrendReq
     ):
         out = fetch_interest_momentum(["AAAA"])
