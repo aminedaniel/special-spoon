@@ -22,7 +22,7 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 LEDGER_COLUMNS = ["ticker", "first_recommended", "first_price"]
-DEFAULT_TOP_N = 2
+DEFAULT_TOP_N = 1
 RANKINGS_DATE_RE = re.compile(r"rankings_(\d{4}-\d{2}-\d{2})\.csv$")
 
 
@@ -82,8 +82,8 @@ def render_markdown(
     lines = [
         f"# Recommendation tracker — as of {as_of.isoformat()}",
         "",
-        "Top-2 picks each week, tracked from the date the screener first "
-        "recommended them to the latest close. Anchors never reset.",
+        "The top pick each week, tracked from the date the screener first "
+        "recommended it to the latest close. Anchors never reset.",
         "",
     ]
     if ledger.empty:

@@ -6,12 +6,22 @@ import pandas as pd
 import pytest
 
 from stock_selector.tracker import (
+    DEFAULT_TOP_N,
     LEDGER_COLUMNS,
     add_new_picks,
     backfill_from_reports,
     render_markdown,
     top_picks,
 )
+
+
+def test_default_tracks_only_top_pick(tmp_path):
+    csv = tmp_path / "rankings_2026-07-28.csv"
+    pd.DataFrame({"ticker": ["AAAA", "BBBB", "CCCC"], "rank": [1, 2, 3]}).to_csv(
+        csv, index=False
+    )
+    assert DEFAULT_TOP_N == 1
+    assert top_picks(csv, top_n=DEFAULT_TOP_N) == ["AAAA"]
 
 
 def _empty_ledger() -> pd.DataFrame:
