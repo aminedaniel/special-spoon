@@ -1,12 +1,13 @@
 # Signal category weights for the composite score. Must sum to 1.0.
 weights:
-  fundamentals: 0.12     # growth + balance-sheet quality (valuation moved out)
+  fundamentals: 0.11     # growth + balance-sheet quality (valuation moved out)
   valuation: 0.06        # cheapness predicts poorly in tech; cut to fund profitability
-  profitability: 0.08    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors
-  technical: 0.10        # cut from 0.22: backtest measured its IC at +0.016, t=0.33
-  earnings_drift: 0.12   # PEAD/SUE — strongest-evidence anomaly; funded from technical
-  insider: 0.14          # officer-weighted cluster buys, discounted sells, 90d
-  quality: 0.10          # accruals gap + share-count dilution
+  profitability: 0.07    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors
+  technical: 0.09        # cut from 0.22: backtest measured its IC at +0.016, t=0.33
+  earnings_drift: 0.11   # PEAD/SUE — strongest-evidence anomaly; funded from technical
+  stability: 0.07        # low beta/idio-vol — the backtest's own beta-1.68 lesson
+  insider: 0.13          # officer-weighted cluster buys, discounted sells, 90d
+  quality: 0.08          # accruals gap + share-count dilution
   short_interest: 0.07   # high/rising short interest predicts negative returns
   events: 0.08           # 13D stakes, shelf registrations, 8-K red flags
   filing_text: 0.08      # 10-Q/10-K language stability ("lazy prices")
