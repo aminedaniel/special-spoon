@@ -28,6 +28,7 @@ from .signals import insider as insider_signal
 from .signals import profitability as profitability_signal
 from .signals import quality as quality_signal
 from .signals import short_interest as short_interest_signal
+from .signals import stability as stability_signal
 from .signals import technical as technical_signal
 from .signals import trends as trends_signal
 from .signals import valuation as valuation_signal
@@ -60,11 +61,21 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
 
     prices = market_data.fetch_price_history(list(gated.index))
 
+    # One benchmark series for the stability signal's beta estimates; a
+    # failed fetch degrades to total-volatility scoring, never a crash.
+    bench_close = None
+    try:
+        bench_frame = market_data.fetch_price_history(["QQQ"])
+        bench_close = bench_frame["Close"]["QQQ"].dropna()
+    except Exception:  # noqa: BLE001 — benchmark is an enhancer, not a dependency
+        log.warning("benchmark fetch failed; stability falls back to total vol")
+
     category_scores: dict[str, pd.Series] = {
         "fundamentals": fundamentals_signal.score(gated),
         "valuation": valuation_signal.score(gated),
         "short_interest": short_interest_signal.score(gated),
         "technical": technical_signal.score(prices).reindex(gated.index),
+        "stability": stability_signal.score(prices, bench_close).reindex(gated.index),
     }
 
     # Stage A composite decides the shortlist for expensive sources.
