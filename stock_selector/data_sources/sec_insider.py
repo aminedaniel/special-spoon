@@ -3,9 +3,18 @@ submissions feed — never full-text search, which would match unrelated
 filings for short/common tickers like 'S' or 'U'.
 
 Two consumers:
-- the weekly run wants net open-market dollars in a trailing window;
+- the weekly run wants windowed activity in a trailing window;
 - the backtest wants the full dated history so it can window any as-of date.
 Both share `fetch_form4_history`, which parses each Form 4 XML exactly once.
+
+Scoring follows what the insider-trading literature actually finds, not the
+naive net-dollar sum:
+- purchases are informative; sales are mostly noise (diversification,
+  liquidity, scheduled 10b5-1 plans), so sells are heavily discounted
+  rather than allowed to cancel real buys one-for-one;
+- officer buys (the people running the company) beat outsider-director buys;
+- *cluster* buys — several distinct insiders buying in the same window —
+  are the strongest single configuration in the literature.
 """
 
 from __future__ import annotations
@@ -28,11 +37,25 @@ LOOKBACK_DAYS = 90
 MAX_FILINGS_PER_TICKER = 40   # weekly-run bound; a quarter holds more Form 4s
 MAX_HISTORY_FILINGS = 80      # backtest bound (years of Form 4s for a small cap)
 
+OFFICER_BUY_WEIGHT = 2.0      # buys by the people running the company
+BASE_BUY_WEIGHT = 1.0         # directors / 10% owners
+SELL_DISCOUNT = 0.25          # sales are mostly noise; don't let them cancel buys 1:1
+CLUSTER_STEP = 0.25           # per extra distinct buyer beyond the first
+CLUSTER_CAP_BUYERS = 5        # multiplier saturates at 2.0 (five distinct buyers)
 
-def parse_form4(xml_text: str) -> tuple[float, float]:
-    """Net (buy_dollars, sell_dollars) from a Form 4's open-market
-    transactions — code P (purchase) and S (sale) only, ignoring awards,
-    option exercises, tax withholding, and gifts."""
+
+def _flag(root: ET.Element, path: str) -> bool:
+    v = (root.findtext(path) or "").strip().lower()
+    return v in ("1", "true")
+
+
+def parse_form4(xml_text: str) -> dict:
+    """One Form 4's open-market activity plus who filed it.
+
+    Only transaction codes P (open-market purchase) and S (open-market sale)
+    count — awards, option exercises, tax withholding, and gifts are excluded.
+    Returns {buy, sell, owner_cik, is_officer, is_director}.
+    """
     buy = sell = 0.0
     root = ET.fromstring(xml_text)
     for tx in root.iter("nonDerivativeTransaction"):
@@ -49,7 +72,21 @@ def parse_form4(xml_text: str) -> tuple[float, float]:
             buy += dollars
         else:
             sell += dollars
-    return buy, sell
+
+    owner = root.find("reportingOwner")
+    owner_cik = None
+    is_officer = is_director = False
+    if owner is not None:
+        owner_cik = (owner.findtext("reportingOwnerId/rptOwnerCik") or "").strip() or None
+        is_officer = _flag(owner, "reportingOwnerRelationship/isOfficer")
+        is_director = _flag(owner, "reportingOwnerRelationship/isDirector")
+    return {
+        "buy": buy,
+        "sell": sell,
+        "owner_cik": owner_cik,
+        "is_officer": is_officer,
+        "is_director": is_director,
+    }
 
 
 def fetch_form4_history(
@@ -57,10 +94,10 @@ def fetch_form4_history(
     ticker: str,
     since: date,
     max_filings: int = MAX_FILINGS_PER_TICKER,
-) -> list[tuple[date, float]] | None:
-    """[(filing_date, net_dollars)] for the issuer's Form 4s since `since`,
-    newest first. None when the ticker can't be resolved or EDGAR fails.
-    A filing whose XML can't be fetched/parsed contributes zero dollars."""
+) -> list[dict] | None:
+    """Dated Form 4 records for the issuer since `since`, newest first.
+    None when the ticker can't be resolved or EDGAR fails. A filing whose
+    XML can't be fetched/parsed contributes a zero-dollar record."""
     cik = client.cik_for(ticker)
     if cik is None:
         log.info("no CIK found for %s; insider signal unavailable", ticker)
@@ -78,16 +115,18 @@ def fetch_form4_history(
         if f["form"] == "4" and f["filingDate"] >= cutoff
     ][:max_filings]
 
-    out: list[tuple[date, float]] = []
+    out: list[dict] = []
     for f in form4s:
-        net = 0.0
+        record = {
+            "buy": 0.0, "sell": 0.0,
+            "owner_cik": None, "is_officer": False, "is_director": False,
+        }
         if f["primaryDocument"].endswith(".xml"):
             try:
                 xml_text = client.filing_text(
                     cik, f["accessionNumber"], f["primaryDocument"]
                 )
-                buy, sell = parse_form4(xml_text)
-                net = buy - sell
+                record = parse_form4(xml_text)
             except Exception as exc:  # noqa: BLE001 — skip unparseable filings
                 log.debug(
                     "Form 4 parse failed for %s %s: %s",
@@ -95,21 +134,46 @@ def fetch_form4_history(
                     f["accessionNumber"],
                     exc,
                 )
-        out.append((date.fromisoformat(f["filingDate"]), net))
+        record["date"] = date.fromisoformat(f["filingDate"])
+        out.append(record)
     return out
 
 
 def window_activity(
-    history: list[tuple[date, float]] | None, as_of: date, lookback_days: int
+    history: list[dict] | None, as_of: date, lookback_days: int
 ) -> dict | None:
-    """Aggregate a Form 4 history into {net_dollars, filings} for the window
-    (as_of - lookback, as_of]. None history stays None (no information)."""
+    """Aggregate a Form 4 history over (as_of - lookback, as_of].
+
+    `signal_dollars` is what the signal ranks: officer buys weighted
+    OFFICER_BUY_WEIGHT, other buys BASE_BUY_WEIGHT, the total scaled up when
+    several *distinct* insiders bought (cluster effect, capped at 2x), minus
+    sells discounted to SELL_DISCOUNT so routine selling can't cancel a real
+    buy cluster one-for-one. `net_dollars` (unweighted buys - sells) is kept
+    for honest reporting alongside the shaped score.
+    """
     if history is None:
         return None
     start = as_of - timedelta(days=lookback_days)
-    in_window = [(d, net) for d, net in history if start < d <= as_of]
+    in_window = [r for r in history if start < r["date"] <= as_of]
+
+    buy_total = sum(r["buy"] for r in in_window)
+    sell_total = sum(r["sell"] for r in in_window)
+    weighted_buys = sum(
+        r["buy"] * (OFFICER_BUY_WEIGHT if r["is_officer"] else BASE_BUY_WEIGHT)
+        for r in in_window
+    )
+    buyers = {
+        r["owner_cik"] for r in in_window if r["buy"] > 0 and r["owner_cik"]
+    }
+    cluster_mult = 1.0 + CLUSTER_STEP * min(
+        max(len(buyers) - 1, 0), CLUSTER_CAP_BUYERS - 1
+    )
     return {
-        "net_dollars": sum(net for _, net in in_window),
+        "signal_dollars": weighted_buys * cluster_mult - SELL_DISCOUNT * sell_total,
+        "net_dollars": buy_total - sell_total,
+        "buy_dollars": buy_total,
+        "sell_dollars": sell_total,
+        "distinct_buyers": len(buyers),
         "filings": len(in_window),
     }
 

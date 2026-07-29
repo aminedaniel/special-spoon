@@ -89,6 +89,15 @@ class EdgarClient:
         ]
 
     def filing_text(self, cik: int, accession: str, doc: str) -> str:
-        """Fetch a filing document's text (HTML included), size-capped."""
+        """Fetch a filing document's text (HTML included), size-capped.
+
+        primaryDocument for Form 3/4/5 often carries an XSL-viewer prefix
+        ("xslF345X05/foo.xml"); fetching that path returns the *rendered
+        HTML*, not the raw XML — the transaction parser then fails on every
+        filing and silently reports zero activity. The raw file lives at the
+        same accession with the bare filename, so the prefix is stripped.
+        """
+        if "/" in doc and doc.split("/", 1)[0].startswith("xsl"):
+            doc = doc.split("/", 1)[1]
         url = FILING_URL.format(cik=cik, accession=accession.replace("-", ""), doc=doc)
         return self._get(url).text[:MAX_DOC_CHARS]
