@@ -144,13 +144,13 @@ signal's IC. Adaptive reweighting runs walk-forward too (weights at each rebalan
 use only *prior* periods' ICs). Output: `output/backtest_*.md` with cumulative
 performance, per-signal predictive power, and the biggest wins ("gems") and losses.
 
-Only truly point-in-time signals participate: technical, insider, events, and
-(with `--include-filing-text`, document-heavy) filing language. Earnings-drift is
-dated and therefore backtestable in principle — wiring it into the walk-forward
-loop is an open follow-up. Fundamentals,
-valuation, quality, and trends are excluded — free sources only serve
-*current* snapshots for those, and backtesting them with today's data would be
-lookahead bias. Results also carry survivorship bias: today's universe omits
+Only truly point-in-time signals participate: technical, stability (trailing-year
+beta/idio-vol from the same sliced prices), earnings-drift (dated announcements via
+the same `surprise_asof` the weekly run uses for "today"), insider, events, and
+(with `--include-filing-text`, document-heavy) filing language. Fundamentals,
+valuation, quality, short interest, and trends are excluded — free sources only
+serve *current* snapshots for those, and backtesting them with today's data would
+be lookahead bias. Results also carry survivorship bias: today's universe omits
 delisted names, so absolute returns flatter; treat relative signal comparisons
 as the useful output.
 

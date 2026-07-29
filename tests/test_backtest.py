@@ -30,6 +30,39 @@ def test_window_forward_return():
     assert ret == pytest.approx(float(exit_ / entry - 1))
 
 
+def test_stability_scores_no_lookahead():
+    from stock_selector.backtest import stability_scores_asof
+
+    prices = make_price_history(days=300)
+    as_of = prices.index[200].date()
+    bench = prices["Close"]["AAAA"] * 0.5  # any aligned series works as a bench
+
+    tampered = prices.copy()
+    tampered.iloc[201:] = tampered.iloc[201:] * 100
+
+    a = stability_scores_asof(prices, bench, as_of)
+    b = stability_scores_asof(tampered, bench, as_of)
+    pd.testing.assert_series_equal(a, b)
+
+
+def test_surprise_asof_no_lookahead():
+    from stock_selector.data_sources.earnings import surprise_asof
+
+    frame = pd.DataFrame(
+        {
+            "EPS Estimate": [0.50, 0.60, 0.70],
+            "Reported EPS": [0.55, 0.72, 1.50],
+        },
+        index=pd.DatetimeIndex(["2026-01-20", "2026-04-15", "2026-07-20"]),
+    )
+    # As of May 1st, only the April announcement is visible: the July blowout
+    # must not leak into the score.
+    out = surprise_asof(frame, date(2026, 5, 1))
+    assert out is not None
+    assert out["surprise_pct"] == (0.72 - 0.60) / 0.60 * 100.0
+    assert out["days_since"] == 16
+
+
 def test_technical_scores_no_lookahead():
     prices = make_price_history(days=300)
     as_of = prices.index[200].date()
@@ -65,6 +98,20 @@ def _histories():
             for t in TICKERS
         },
         "text_cache": None,
+        # Announcements pre-date every rebalance (2026-04-01 onward) and stay
+        # inside the 75-day drift window. All five tickers score, with
+        # distinct surprises, because signal_ic requires >=5 scored names
+        # before it will report an IC at all.
+        "earnings": {
+            t: pd.DataFrame(
+                {
+                    "EPS Estimate": [0.50],
+                    "Reported EPS": [0.40 + 0.05 * i],
+                },
+                index=pd.DatetimeIndex(["2026-03-20"]),
+            )
+            for i, t in enumerate(TICKERS)
+        },
     }
 
 
@@ -97,5 +144,7 @@ def test_run_backtest_produces_periods_ic_and_picks():
     assert result.picks["forward_return"].notna().all()
     # ICs recorded for the point-in-time signals
     assert "technical" in result.ic_history.columns
+    assert "stability" in result.ic_history.columns
+    assert "earnings_drift" in result.ic_history.columns
     # weights recorded per period and sum to 1
     assert result.weights_used.sum(axis=1).round(6).eq(1.0).all()

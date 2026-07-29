@@ -7,7 +7,7 @@ import pandas as pd
 
 from stock_selector.data_sources.earnings import (
     DRIFT_WINDOW_DAYS,
-    _latest_in_window,
+    surprise_asof,
     standardized_surprise,
 )
 from stock_selector.signals import earnings_drift
@@ -33,7 +33,7 @@ def test_latest_in_window_picks_newest_reported():
         "2026-07-15": (0.60, 0.72),          # 14 days before as_of — in window
         "2026-10-20": (0.65, None),          # scheduled future date
     })
-    out = _latest_in_window(f, AS_OF)
+    out = surprise_asof(f, AS_OF)
     assert out is not None
     assert out["days_since"] == 14
     assert out["surprise_pct"] == (0.72 - 0.60) / 0.60 * 100.0
@@ -42,12 +42,12 @@ def test_latest_in_window_picks_newest_reported():
 def test_announcement_past_drift_window_is_none():
     stale = AS_OF - pd.Timedelta(days=DRIFT_WINDOW_DAYS + 1)
     f = _frame({stale.isoformat(): (0.50, 0.90)})
-    assert _latest_in_window(f, AS_OF) is None
+    assert surprise_asof(f, AS_OF) is None
 
 
 def test_missing_estimate_is_none():
     f = _frame({"2026-07-15": (None, 0.72)})
-    assert _latest_in_window(f, AS_OF) is None
+    assert surprise_asof(f, AS_OF) is None
 
 
 def test_sue_scales_by_prior_volatility():
