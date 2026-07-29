@@ -66,6 +66,23 @@ def main() -> int:
         print(f"   S-3: {forms.get('S-3', 0)}   8-K: {forms.get('8-K', 0)}   "
               f"Form 4: {forms.get('4', 0)}")
 
+        # Probe one raw Form 4 fetch end-to-end so parse failures are visible
+        # here instead of being swallowed as $0 records.
+        f4_rows = [f for f in filings if f["form"] == "4"]
+        if f4_rows:
+            probe = f4_rows[0]
+            print(f"   probe primaryDocument: {probe['primaryDocument']!r}")
+            try:
+                text = client.filing_text(
+                    cik, probe["accessionNumber"], probe["primaryDocument"]
+                )
+                head = text.lstrip()[:80].replace("\n", " ")
+                print(f"   probe fetched head: {head!r}")
+                from stock_selector.data_sources.sec_insider import parse_form4
+                print(f"   probe parse: {parse_form4(text)}")
+            except Exception as exc:  # noqa: BLE001 — diagnostic wants the error
+                print(f"   probe FAILED: {type(exc).__name__}: {exc}")
+
         # Insider: 14-day vs 90-day open-market activity.
         hist = fetch_form4_history(client, t, today - timedelta(days=90), max_filings=40)
         if hist is None:
@@ -73,10 +90,13 @@ def main() -> int:
             continue
         for days in (14, 90):
             start = today - timedelta(days=days)
-            win = [(d, n) for d, n in hist if start < d <= today]
-            nonzero = [n for _, n in win if n != 0.0]
+            win = [r for r in hist if start < r["date"] <= today]
+            active = [r for r in win if r["buy"] or r["sell"]]
+            buyers = {r["owner_cik"] for r in win if r["buy"] > 0 and r["owner_cik"]}
+            net = sum(r["buy"] - r["sell"] for r in win)
             print(f"   {days:>2}d window: {len(win)} Form 4s, "
-                  f"{len(nonzero)} with open-market $ , net ${sum(nonzero):,.0f}")
+                  f"{len(active)} with open-market $ , net ${net:,.0f}, "
+                  f"{len(buyers)} distinct buyers")
         print()
 
     print("=== VERDICT ===")

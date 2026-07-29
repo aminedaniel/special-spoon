@@ -47,7 +47,12 @@ def _histories():
     d = date(2026, 6, 20)
     return {
         "form4": {
-            t: ([(d, 100000.0)] if t == "AAAA" else [])
+            t: (
+                [{"date": d, "buy": 100000.0, "sell": 0.0,
+                  "owner_cik": "0001", "is_officer": True, "is_director": False}]
+                if t == "AAAA"
+                else []
+            )
             for t in TICKERS
         },
         "filings": {
