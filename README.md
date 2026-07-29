@@ -7,10 +7,11 @@ them by a weighted composite of:
 |---|---|---|
 | Earnings drift / PEAD (standardized earnings surprise) | 0.12 | Yahoo Finance earnings dates via `yfinance` |
 | Technicals (trend, momentum, RSI, breakout, volume) | 0.10 | Yahoo Finance via `yfinance` |
-| Fundamentals (growth, debt, ROE, margins) | 0.16 | Yahoo Finance via `yfinance` |
+| Fundamentals (growth, debt, ROE, margins) | 0.12 | Yahoo Finance via `yfinance` |
+| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.08 | Yahoo Finance statements via `yfinance` |
 | Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.16 | SEC EDGAR issuer submissions + Form 4 XML |
 | Quality (accrual gap, share dilution) | 0.11 | Yahoo Finance financial fields + share history |
-| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.10 | Yahoo Finance via `yfinance` |
+| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.06 | Yahoo Finance via `yfinance` |
 | Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
 | Search-interest momentum (retail attention) | 0.08 | Google Trends via `pytrends` |
