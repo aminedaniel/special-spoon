@@ -73,16 +73,23 @@ def test_full_run_includes_stage_b(
 
     mock_fund.return_value = make_fundamentals()
     mock_prices.return_value = make_price_history()
+    # Net dollars must differ per ticker: an identical value across the whole
+    # shortlist is a degenerate category and the pipeline drops it by design.
     mock_form4.return_value = {
-        t: {"net_dollars": 50000.0, "filings": 3} for t in TICKERS[:4]
+        t: {"net_dollars": 50000.0 * (i + 1), "filings": 3}
+        for i, t in enumerate(TICKERS[:4])
     }
     mock_congress.return_value = {
         t: {"buys": 2 if t == "AAAA" else 0, "sells": 0} for t in TICKERS[:4]
     }
     mock_regime.return_value = {"label": "neutral", "detail": {"vix": 15.0}}
     mock_events.return_value = {t: (2.0 if t == "BBBB" else 0.0) for t in TICKERS[:4]}
-    mock_sim.return_value = {t: 0.9 for t in TICKERS[:4]}
-    mock_shares.return_value = pd.Series({t: 0.02 for t in TICKERS[:4]})
+    mock_sim.return_value = {
+        t: 0.9 - 0.05 * i for i, t in enumerate(TICKERS[:4])
+    }
+    mock_shares.return_value = pd.Series(
+        {t: 0.02 * (i + 1) for i, t in enumerate(TICKERS[:4])}
+    )
     mock_trends.return_value = {t: (1.2 if t == "CCCC" else 0.0) for t in TICKERS[:4]}
 
     result = run(_config(), skip_stage_b=False)

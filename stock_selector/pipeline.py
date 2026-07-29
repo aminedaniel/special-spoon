@@ -19,7 +19,7 @@ from .data_sources import (
     sec_insider,
 )
 from .data_sources.edgar import EdgarClient
-from .scoring import apply_quality_gate, composite_score
+from .scoring import apply_quality_gate, composite_score, degenerate_categories
 from .signals import congress as congress_signal
 from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
@@ -120,6 +120,15 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
     shortlist_scores = {
         name: s.reindex(shortlist) for name, s in category_scores.items()
     }
+    # A category identical across the whole shortlist can't reorder anything;
+    # keeping it would only spend its weight. Drop it and say so.
+    for name in degenerate_categories(shortlist_scores):
+        del shortlist_scores[name]
+        notes.append(
+            f"{name.replace('_', ' ').capitalize()} signal carried no information "
+            "this run (identical score for every ticker — no differentiating "
+            "activity in its window); its weight was redistributed"
+        )
     rankings = composite_score(shortlist_scores, config.weights)
 
     # Attach display columns from fundamentals.

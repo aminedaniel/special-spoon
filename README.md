@@ -7,7 +7,7 @@ them by a weighted composite of:
 |---|---|---|
 | Technicals (trend, momentum, RSI, breakout, volume) | 0.21 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.15 | Yahoo Finance via `yfinance` |
-| Insider activity (net open-market Form 4 dollars) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
+| Insider activity (net open-market Form 4 dollars, trailing 90d) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.10 | Yahoo Finance via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
 | Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
@@ -33,6 +33,13 @@ Two-stage funnel to stay inside free-API rate limits:
 2. **Stage B** — only the top `stage_a_shortlist_size` names get the expensive
    per-ticker calls (SEC EDGAR, congressional data). Missing data never zeroes a
    score: weights renormalize over the categories actually present.
+
+A signal that comes back **identical for every ticker** is dropped and its weight
+redistributed, same as a missing one. Percentile-ranking an all-constant input
+(e.g. no ticker had open-market insider activity in the window) hands everyone the
+same mid-rank, which cannot reorder anything — it is the inert-scalar trap that
+keeps macro unweighted. Left in, it would still consume its weight and dilute the
+signals that do discriminate. The report says which signals this hit.
 
 Output: `output/report_YYYY-MM-DD.md` (readable report) and
 `output/rankings_YYYY-MM-DD.csv` (full scored shortlist).
@@ -197,6 +204,13 @@ data source fails soft, but a run with no market data cannot rank anything.
   transactions feed-wide) and the congress signal is marked unavailable rather than
   scored as zeros; its weight redistributes and the report says so. A maintained
   free replacement source is an open v2 item.
+- **Corporate-events signal returns nothing so far** — the first live run with SEC
+  credentials scored 0.0 events for all 63 shortlisted names despite 120-day
+  stake/shelf windows. Likely cause: SC 13D/13G are filed *by the holder*, so they
+  may not appear in the subject issuer's own `data.sec.gov` submissions feed, which
+  is what this reads. Unverified — needs a live check against a name known to have a
+  recent 13D. Until then the degenerate-signal guard marks it unavailable and
+  redistributes its 0.09 weight, so it costs nothing but contributes nothing.
 - **yfinance is unofficial** — Yahoo can change endpoints; per-ticker failures are
   skipped and counted in the report header.
 - Not investment advice; it's an automated research screen.

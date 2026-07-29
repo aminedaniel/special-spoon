@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from stock_selector.scoring import apply_quality_gate, composite_score
+from stock_selector.scoring import (
+    apply_quality_gate,
+    composite_score,
+    degenerate_categories,
+)
 from stock_selector.signals.base import percentile_score
 
 
@@ -70,3 +74,35 @@ def test_quality_gate_excludes_extreme_pe(fundamentals):
     assert "BBBB" not in gated.index  # PE 35 > 30
     assert "DDDD" not in gated.index  # PE 55 > 30
     assert "CCCC" in gated.index      # null PE still passes
+
+
+def test_percentile_score_of_constant_input_is_flat():
+    """The failure this guards against: ranking an all-identical series hands
+    every ticker the same mid-rank, which cannot reorder anything."""
+    flat = percentile_score(pd.Series({"a": 0.0, "b": 0.0, "c": 0.0}))
+    assert flat.nunique() == 1
+
+
+def test_degenerate_categories_flags_constant_only():
+    cats = {
+        "technical": pd.Series({"a": 10.0, "b": 90.0, "c": 50.0}),
+        "insider": pd.Series({"a": 50.8, "b": 50.8, "c": 50.8}),  # no activity
+        "events": pd.Series({"a": np.nan, "b": 50.8, "c": 50.8}),  # constant where present
+        "trends": pd.Series({"a": np.nan, "b": np.nan, "c": 40.0}),  # single obs, not degenerate
+    }
+    assert degenerate_categories(cats) == ["insider", "events"]
+
+
+def test_dropping_a_degenerate_category_changes_no_order_but_frees_weight():
+    varying = pd.Series({"a": 10.0, "b": 90.0})
+    flat = pd.Series({"a": 50.0, "b": 50.0})
+    weights = {"technical": 0.5, "insider": 0.5}
+
+    with_flat = composite_score({"technical": varying, "insider": flat}, weights)
+    without = composite_score({"technical": varying}, weights)
+
+    # Order is identical either way — the flat category never had a say.
+    assert list(with_flat.index) == list(without.index)
+    # But dropping it lets the real signal carry its own full range.
+    assert with_flat["composite"]["b"] == pytest.approx(70.0)
+    assert without["composite"]["b"] == pytest.approx(90.0)
