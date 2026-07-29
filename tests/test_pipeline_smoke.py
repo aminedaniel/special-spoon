@@ -18,7 +18,8 @@ def _config() -> Config:
         weights={
             "fundamentals": 0.16,
             "valuation": 0.10,
-            "technical": 0.22,
+            "technical": 0.10,
+            "earnings_drift": 0.12,
             "insider": 0.16,
             "quality": 0.11,
             "events": 0.09,
@@ -55,6 +56,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
     assert list(result.rankings["rank"]) == [1, 2, 3, 4]
 
 
+@patch("stock_selector.pipeline.earnings.fetch_earnings_surprise")
 @patch("stock_selector.pipeline.google_trends.fetch_interest_momentum")
 @patch("stock_selector.pipeline.market_data.fetch_share_change")
 @patch("stock_selector.pipeline.edgar_filings.fetch_filing_similarity")
@@ -65,7 +67,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
     mock_fund, mock_prices, mock_form4, mock_regime,
-    mock_events, mock_sim, mock_shares, mock_trends, tmp_path
+    mock_events, mock_sim, mock_shares, mock_trends, mock_surprise, tmp_path
 ):
     import pandas as pd
 
@@ -86,6 +88,14 @@ def test_full_run_includes_stage_b(
         {t: 0.02 * (i + 1) for i, t in enumerate(TICKERS[:4])}
     )
     mock_trends.return_value = {t: (1.2 if t == "CCCC" else 0.0) for t in TICKERS[:4]}
+    mock_surprise.return_value = {
+        t: (
+            {"sue": 2.5, "surprise_pct": 9.0, "days_since": 12}
+            if t == "AAAA"
+            else {"sue": -1.0 - 0.1 * i, "surprise_pct": -4.0, "days_since": 30}
+        )
+        for i, t in enumerate(TICKERS[:4])
+    }
 
     result = run(_config(), skip_stage_b=False)
 
@@ -97,6 +107,8 @@ def test_full_run_includes_stage_b(
     assert "score_trends" in result.rankings.columns
     events = result.rankings["score_events"]
     assert events["BBBB"] == events.max()  # the 13D holder ranks top on events
+    drift = result.rankings["score_earnings_drift"]
+    assert drift["AAAA"] == drift.max()  # the big beat ranks top on drift
     trends = result.rankings["score_trends"]
     assert trends["CCCC"] == trends.max()  # the search-spike name ranks top on trends
     assert result.regime["label"] == "neutral"

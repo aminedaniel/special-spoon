@@ -1,13 +1,14 @@
 # Signal category weights for the composite score. Must sum to 1.0.
 weights:
-  fundamentals: 0.16   # growth + balance-sheet quality (valuation moved out)
-  valuation: 0.10      # P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF (cheaper = better)
-  technical: 0.22
-  insider: 0.16        # net open-market Form 4 dollars, trailing 90 days
-  quality: 0.11        # accruals gap + share-count dilution
-  events: 0.09         # 13D stakes, shelf registrations, 8-K red flags
-  filing_text: 0.08    # 10-Q/10-K language stability ("lazy prices")
-  trends: 0.08         # Google Trends search-interest momentum (unproven; small)
+  fundamentals: 0.16     # growth + balance-sheet quality (valuation moved out)
+  valuation: 0.10        # P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF (cheaper = better)
+  technical: 0.10        # cut from 0.22: backtest measured its IC at +0.016, t=0.33
+  earnings_drift: 0.12   # PEAD/SUE — strongest-evidence anomaly; funded from technical
+  insider: 0.16          # net open-market Form 4 dollars, trailing 90 days
+  quality: 0.11          # accruals gap + share-count dilution
+  events: 0.09           # 13D stakes, shelf registrations, 8-K red flags
+  filing_text: 0.08      # 10-Q/10-K language stability ("lazy prices")
+  trends: 0.08           # Google Trends search-interest momentum (unproven; small)
 
 # Quality gate applied to the universe before scoring.
 thresholds:
