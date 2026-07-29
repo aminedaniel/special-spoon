@@ -66,3 +66,67 @@ more often**, i.e. diversification — not a different weighting of signals. Sig
 weights cannot be evaluated from these runs at all, because only one signal ran.
 Adding the `SEC_EDGAR_USER_AGENT` secret and re-running would put insider, events,
 and filing-text into the comparison and make the IC column meaningful.
+
+---
+
+# Five-signal run (2026-07-29) — the first real signal measurement
+
+Everything above measured **one signal**. The insider signal was silently
+returning $0 for every ticker in every one of those runs: `primaryDocument` for
+Form 3/4/5 carries an XSL-viewer prefix, so fetching it returned rendered HTML
+instead of XML and every parse failed. That is fixed, and `stability` and
+`earnings_drift` are now wired into the walk-forward loop, so this run grades
+five signals over the same window and cadence as the top-10/4w baseline.
+
+## Per-signal IC — 27 non-overlapping periods
+
+| Signal | Mean IC | sd | t | 95% CI | % periods positive |
+|---|---|---|---|---|---|
+| insider | **+0.068** | 0.179 | **+1.96** | [+0.000, +0.135] | 67% |
+| technical | +0.029 | 0.249 | +0.61 | [−0.064, +0.123] | 59% |
+| earnings_drift | +0.001 | 0.115 | +0.03 | [−0.043, +0.044] | 56% |
+| events | −0.002 | 0.124 | −0.10 | [−0.049, +0.044] | 48% |
+| stability | −0.077 | 0.269 | −1.49 | [−0.179, +0.025] | 41% |
+
+## Portfolio-level, same window and cadence
+
+| | Technical only | Five signals |
+|---|---|---|
+| Cumulative | +28.6% | **+38.9%** |
+| Std dev / period | 13.3% | **9.7%** |
+| Worst period | −27.8% | **−20.3%** |
+| Beta vs QQQ | 1.68 | **1.32** |
+| CAPM alpha (annualized) | −8.9% | **−4.3%** |
+| Alpha hit rate | 48% | 52% |
+
+Better on every dimension, and still behind QQQ (+43.0%) with negative alpha.
+The gain is risk reduction, not edge.
+
+## What this changed
+
+- **insider 0.13 → 0.18.** The only signal whose CI clears zero, the most
+  consistent (67%), and the lowest-volatility of the meaningful ones. It also
+  has the best prior: it is the one signal here reading *private information*
+  rather than public prices.
+- **stability 0.07 → 0.02.** Measured backwards. The weight was set hours
+  earlier on this repo's *portfolio-level* finding that lower beta compounded
+  better — the direct per-name test says that inference was wrong. Floored
+  rather than removed: 2024-26 was a momentum-led small-cap market, which is
+  exactly when betting against beta loses, and a zero weight can never recover.
+- **earnings_drift held at 0.11** despite a flat IC. Only ~20 of 99 names have
+  an announcement inside the drift window in any period, so the cross-section
+  being ranked is small and the estimate is correspondingly weak — that is
+  absence of evidence, not evidence of absence.
+- **events held at 0.08.** Its ~0.000 IC was measured with the *old* code: the
+  shelf-family match (S-3ASR/F-3) and Friday-dump penalty landed after this
+  data was generated, and the diagnostic showed plain "S-3" never matched
+  anything. Worth re-measuring, not reweighting.
+
+## Honest limits
+
+27 periods over 2 years, one universe, one regime. t=1.96 on insider is exactly
+at the conventional threshold, and with five signals examined, some multiple-
+comparisons discount is warranted — treat it as "promising and worth weight",
+not "established". Survivorship bias still inflates absolute returns. The seven
+signals that cannot be backtested on free data (fundamentals, valuation,
+quality, profitability, short interest, filing-text, trends) remain unmeasured.
