@@ -1,41 +1,10 @@
-"""Data-source behavior: congress staleness, EDGAR CIK scoping, Form 4 math."""
+"""Data-source behavior: EDGAR CIK scoping and Form 4 math."""
 
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from stock_selector.data_sources import congress_trades, sec_insider
+from stock_selector.data_sources import sec_insider
 from stock_selector.data_sources.edgar import EdgarClient
-
-RECENT = (date.today() - timedelta(days=5)).strftime("%m/%d/%Y")
-STALE = "01/15/2020"
-
-
-@patch("stock_selector.data_sources.congress_trades._fetch")
-def test_congress_counts_recent_transactions(mock_fetch):
-    mock_fetch.return_value = [
-        {"ticker": "AAAA", "transaction_date": RECENT, "type": "purchase"},
-        {"ticker": "AAAA", "transaction_date": RECENT, "type": "sale (full)"},
-        {"ticker": "ZZZZ", "transaction_date": RECENT, "type": "purchase"},
-    ]
-    out = congress_trades.fetch_recent_activity(["AAAA", "BBBB"])
-    assert out == {"AAAA": {"buys": 2, "sells": 2}, "BBBB": {"buys": 0, "sells": 0}}
-
-
-@patch("stock_selector.data_sources.congress_trades._fetch")
-def test_congress_stale_feed_returns_none(mock_fetch):
-    # Feed reachable but every transaction predates the window (dead dataset):
-    # must be None (no information), not zeros for everyone.
-    mock_fetch.return_value = [
-        {"ticker": "AAAA", "transaction_date": STALE, "type": "purchase"},
-    ]
-    assert congress_trades.fetch_recent_activity(["AAAA"]) is None
-
-
-@patch("stock_selector.data_sources.congress_trades._fetch")
-def test_congress_all_feeds_down_returns_none(mock_fetch):
-    mock_fetch.side_effect = ConnectionError("boom")
-    assert congress_trades.fetch_recent_activity(["AAAA"]) is None
-
 
 FORM4_XML = """<?xml version="1.0"?>
 <ownershipDocument>

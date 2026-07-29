@@ -1,0 +1,28 @@
+name: Diagnose EDGAR
+
+# Manual only. Prints what the SEC submissions feed actually contains for a
+# handful of tickers, so signal behaviour can be checked against live data
+# instead of guessed at. Writes nothing to the repo.
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: "Comma-separated tickers to inspect"
+        type: string
+        default: "RNG,QLYS,DBX,GEN,PRGS,CRTO,YELP,TENB,BOX,FIVN"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Inspect EDGAR feeds
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: python scripts/diagnose_edgar.py --tickers "${{ inputs.tickers }}"

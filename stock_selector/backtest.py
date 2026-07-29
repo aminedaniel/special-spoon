@@ -6,7 +6,7 @@ Only signals that are truly reconstructable as-of a past date participate:
   - events:    13D/13G/S-3/8-K filings dated on/before the rebalance date
   - filing_text (opt-in, document-heavy): periodic reports filed by the date
 
-Fundamentals, quality, and congress are EXCLUDED: free sources only serve
+Fundamentals and quality are EXCLUDED: free sources only serve
 current snapshots for those, and scoring the past with today's data is
 lookahead bias dressed up as results.
 
@@ -317,7 +317,7 @@ def render_markdown(result: BacktestResult, top_n: int, step_weeks: int) -> str:
         "---",
         "",
         "*Caveats: survivorship bias (today's universe excludes delisted names, "
-        "inflating absolute returns); fundamentals/quality/congress signals are "
+        "inflating absolute returns); fundamentals/quality/valuation signals are "
         "excluded because free sources only provide current snapshots (using them "
         "historically would be lookahead). Research output, not investment advice.*",
         "",

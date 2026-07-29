@@ -4,7 +4,7 @@
 Examples:
     python run_weekly_report.py
     python run_weekly_report.py --universe my_watchlist.csv --top-n 10
-    python run_weekly_report.py --dry-run   # Stage A only, no EDGAR/congress/FRED
+    python run_weekly_report.py --dry-run   # Stage A only, no EDGAR/Trends/FRED
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Stage A only: skip insider/congress/FRED calls",
+        help="Stage A only: skip EDGAR/Trends/FRED calls",
     )
     parser.add_argument(
         "--no-adaptive", action="store_true",

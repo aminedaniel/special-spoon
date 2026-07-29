@@ -16,15 +16,14 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.15,
+            "fundamentals": 0.16,
             "valuation": 0.10,
-            "technical": 0.21,
-            "insider": 0.15,
-            "congress": 0.05,
-            "quality": 0.10,
-            "filing_text": 0.08,
+            "technical": 0.22,
+            "insider": 0.16,
+            "quality": 0.11,
             "events": 0.09,
-            "trends": 0.07,
+            "filing_text": 0.08,
+            "trends": 0.08,
         },
         thresholds={"min_market_cap": 1e8, "max_market_cap": 20e9, "max_pe": 60},
         top_n=3,
@@ -61,12 +60,11 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 @patch("stock_selector.pipeline.edgar_filings.fetch_filing_similarity")
 @patch("stock_selector.pipeline.edgar_filings.fetch_event_points")
 @patch("stock_selector.pipeline.macro_fred.fetch_regime")
-@patch("stock_selector.pipeline.congress_trades.fetch_recent_activity")
 @patch("stock_selector.pipeline.sec_insider.fetch_form4_activity")
 @patch("stock_selector.pipeline.market_data.fetch_price_history")
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
-    mock_fund, mock_prices, mock_form4, mock_congress, mock_regime,
+    mock_fund, mock_prices, mock_form4, mock_regime,
     mock_events, mock_sim, mock_shares, mock_trends, tmp_path
 ):
     import pandas as pd
@@ -78,9 +76,6 @@ def test_full_run_includes_stage_b(
     mock_form4.return_value = {
         t: {"net_dollars": 50000.0 * (i + 1), "filings": 3}
         for i, t in enumerate(TICKERS[:4])
-    }
-    mock_congress.return_value = {
-        t: {"buys": 2 if t == "AAAA" else 0, "sells": 0} for t in TICKERS[:4]
     }
     mock_regime.return_value = {"label": "neutral", "detail": {"vix": 15.0}}
     mock_events.return_value = {t: (2.0 if t == "BBBB" else 0.0) for t in TICKERS[:4]}
@@ -96,7 +91,6 @@ def test_full_run_includes_stage_b(
 
     assert "score_valuation" in result.rankings.columns
     assert "score_insider" in result.rankings.columns
-    assert "score_congress" in result.rankings.columns
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
     assert "score_quality" in result.rankings.columns
@@ -106,9 +100,6 @@ def test_full_run_includes_stage_b(
     trends = result.rankings["score_trends"]
     assert trends["CCCC"] == trends.max()  # the search-spike name ranks top on trends
     assert result.regime["label"] == "neutral"
-    # congress signal favors the ticker with disclosed buys
-    congress = result.rankings["score_congress"]
-    assert congress["AAAA"] == congress.max()
 
     md_path, _ = write_report(result, top_n=3, output_dir=tmp_path)
     assert "Market regime:** neutral" in md_path.read_text()

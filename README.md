@@ -5,15 +5,14 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.21 | Yahoo Finance via `yfinance` |
-| Fundamentals (growth, debt, ROE, margins) | 0.15 | Yahoo Finance via `yfinance` |
-| Insider activity (net open-market Form 4 dollars, trailing 90d) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
+| Technicals (trend, momentum, RSI, breakout, volume) | 0.22 | Yahoo Finance via `yfinance` |
+| Fundamentals (growth, debt, ROE, margins) | 0.16 | Yahoo Finance via `yfinance` |
+| Insider activity (net open-market Form 4 dollars, trailing 90d) | 0.16 | SEC EDGAR issuer submissions + Form 4 XML |
+| Quality (accrual gap, share dilution) | 0.11 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.10 | Yahoo Finance via `yfinance` |
-| Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
 | Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
-| Search-interest momentum (retail attention) | 0.07 | Google Trends via `pytrends` |
-| Congressional trading (disclosed buys − sells) | 0.05 | Senate/House Stock Watcher |
+| Search-interest momentum (retail attention) | 0.08 | Google Trends via `pytrends` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
 Weights are *base* weights: once enough graded history accumulates, the scoreboard
@@ -31,7 +30,7 @@ Two-stage funnel to stay inside free-API rate limits:
 1. **Stage A** — batched fundamentals + 1y price history for the whole universe,
    quality gate (cap band, extreme P/E), rank on fundamentals + technicals.
 2. **Stage B** — only the top `stage_a_shortlist_size` names get the expensive
-   per-ticker calls (SEC EDGAR, congressional data). Missing data never zeroes a
+   per-ticker calls (SEC EDGAR, Google Trends). Missing data never zeroes a
    score: weights renormalize over the categories actually present.
 
 A signal that comes back **identical for every ticker** is dropped and its weight
@@ -57,7 +56,7 @@ cp .env.example .env      # then fill in:
 
 ```bash
 python run_weekly_report.py                       # full weekly run
-python run_weekly_report.py --dry-run             # Stage A only, no EDGAR/congress/FRED
+python run_weekly_report.py --dry-run             # Stage A only, no EDGAR/Trends/FRED
 python run_weekly_report.py --universe my.csv     # custom watchlist (needs 'ticker' column)
 python run_weekly_report.py --top-n 10 -v
 ```
@@ -72,6 +71,9 @@ Two GitHub Actions workflows:
 - `weekly_report.yml` — **Monday** morning (11:37 UTC): generates the report and
   commits it to `reports/` on main. Also runnable on demand from the Actions tab
   (workflow_dispatch).
+- `backtest.yml` / `diagnose.yml` — manual only. `diagnose` prints what the SEC
+  submissions feed actually contains for a few tickers, so signal behaviour can be
+  checked against live data instead of guessed at (`scripts/diagnose_edgar.py`).
 
 Add two repository secrets (Settings → Secrets and variables → Actions) for full
 signal coverage: `FRED_API_KEY` and `SEC_EDGAR_USER_AGENT`. Without them the run
@@ -132,7 +134,7 @@ performance, per-signal predictive power, and the biggest wins ("gems") and loss
 
 Only truly point-in-time signals participate: technical, insider, events, and
 (with `--include-filing-text`, document-heavy) filing language. Fundamentals,
-valuation, quality, trends, and congress are excluded — free sources only serve
+valuation, quality, and trends are excluded — free sources only serve
 *current* snapshots for those, and backtesting them with today's data would be
 lookahead bias. Results also carry survivorship bias: today's universe omits
 delisted names, so absolute returns flatter; treat relative signal comparisons
@@ -197,13 +199,13 @@ data source fails soft, but a run with no market data cannot rank anything.
 
 ## Known caveats
 
-- **Congressional data lag** — the STOCK Act allows 30–45 days to disclose, so that
-  signal reflects trades made weeks earlier. The report footer says so.
-- **Senate/House Stock Watcher availability** — these community datasets have had
-  outages and may no longer be maintained. Staleness is detected (no in-window
-  transactions feed-wide) and the congress signal is marked unavailable rather than
-  scored as zeros; its weight redistributes and the report says so. A maintained
-  free replacement source is an open v2 item.
+- **Congressional trading was removed** (was 0.05). Two independent reasons, either
+  sufficient: the Senate/House Stock Watcher datasets stopped returning in-window
+  transactions and appear unmaintained, and even at full health the STOCK Act allows
+  30–45 days to disclose — so the signal reports trades that are already six weeks
+  stale in a screen that reruns weekly. Its weight was redistributed across the
+  remaining eight. Reinstating it needs a *maintained* free source, which is an open
+  v2 item; the code is recoverable from git history.
 - **Corporate-events signal returns nothing so far** — the first live run with SEC
   credentials scored 0.0 events for all 63 shortlisted names despite 120-day
   stake/shelf windows. Likely cause: SC 13D/13G are filed *by the holder*, so they
