@@ -125,10 +125,39 @@ performance, per-signal predictive power, and the biggest wins ("gems") and loss
 
 Only truly point-in-time signals participate: technical, insider, events, and
 (with `--include-filing-text`, document-heavy) filing language. Fundamentals,
-quality, and congress are excluded — free sources only serve *current* snapshots
-for those, and backtesting them with today's data would be lookahead bias.
-Results also carry survivorship bias: today's universe omits delisted names, so
-absolute returns flatter; treat relative signal comparisons as the useful output.
+valuation, quality, trends, and congress are excluded — free sources only serve
+*current* snapshots for those, and backtesting them with today's data would be
+lookahead bias. Results also carry survivorship bias: today's universe omits
+delisted names, so absolute returns flatter; treat relative signal comparisons
+as the useful output.
+
+Also runnable from the Actions tab (**Backtest** → Run workflow) with start/end,
+step-weeks, top-n, and filing-text as inputs; results are committed to
+`reports/backtests/`. Set the `SEC_EDGAR_USER_AGENT` secret first — without it the
+run measures the technical signal only.
+
+### How much data before re-weighting?
+
+IC is a rank correlation, so the standard error of its mean scales as `σ_IC/√T`.
+With typical cross-sectional IC volatility (~0.15), reaching a t-stat of 2 takes
+roughly **9 periods for a strong signal (IC ≈ 0.10), ~36 for a modest one
+(IC ≈ 0.05), and ~100 for a weak one (IC ≈ 0.03)**. The adaptive machinery starts
+tilting after 6 graded reports, but that early tilt is deliberately shrunk and
+capped — treat ~6 months as the point where a live-measured weight change is worth
+acting on manually, and ~1 year before trusting a modest signal.
+
+Two measurement caveats worth knowing:
+
+- **Scoreboard ICs overlap.** Each report is graded on its return *to today*, so
+  consecutive weekly reports share nearly the same return window. They are not
+  independent samples, and the report count overstates the evidence.
+- **Backtest ICs don't.** The walk-forward loop uses non-overlapping forward
+  returns per rebalance, so its ICs are the statistically sound number. Prefer the
+  backtest for weight decisions; treat the scoreboard as the running indicator.
+
+Reading the output: sustained mean IC above **+0.03** is likely real, **|IC| < 0.02**
+is noise regardless of sign, and a consistently *negative* IC means the signal is
+scored backwards.
 
 ## Universe
 
