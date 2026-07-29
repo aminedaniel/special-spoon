@@ -75,6 +75,23 @@ signals (fundamentals, quality, filing-text) only change quarterly, so day-to-da
 ranking moves mainly on technicals and search-interest — the daily screen is a
 refresh, the deep dive stays weekly by design.
 
+### Recommendation tracker
+
+A running ledger of the **top-2 picks**, updated **weekly (Mondays)**: each new
+top-2 name is anchored once — to the date and price at which the screener first
+recommended it — and never re-dated, even if it drops out of the top 2 and returns.
+Each run refreshes the current price and shows the change since first recommendation.
+Output: `reports/recommendations.md` (readable table) and `recommendations.csv` (the
+durable ledger). Run manually with `python run_tracker.py --reports-dir reports`.
+
+To seed the ledger from existing reports using historical closes on each report date,
+run the workflow manually (Actions tab → "Daily stock report" → Run workflow →
+`backfill_tracker: true`), or locally: `python run_tracker.py --reports-dir reports --backfill`.
+
+Distinct from the scoreboard below: the scoreboard grades a *cohort* (each week's full
+top-N return vs benchmarks) to tune weights; the tracker follows *individual names* from
+first pickup so you can watch a specific pick over time.
+
 ### Performance scoreboard
 
 Each weekly run also grades every past report old enough to matter (≥7 days):

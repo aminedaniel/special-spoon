@@ -7,7 +7,12 @@ on:
     # weekends, so no run Sat/Sun. Delivery Routines fire at 16:00 UTC to allow
     # for remaining schedule delay.
     - cron: "37 11 * * 1-5"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      backfill_tracker:
+        description: "One-time: seed the recommendation tracker from all past reports (historical closes)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +34,17 @@ jobs:
         run: python run_weekly_report.py --output-dir reports
       - name: Update scoreboard
         run: python run_scoreboard.py --reports-dir reports
+      - name: Backfill recommendation tracker (manual, one-time)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_tracker }}
+        run: python run_tracker.py --reports-dir reports --top-n 2 --backfill
+      - name: Update recommendation tracker (Mondays)
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          if [ "$(date -u +%u)" = "1" ]; then
+            python run_tracker.py --reports-dir reports --top-n 2
+          else
+            echo "Not Monday — skipping weekly tracker update."
+          fi
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
