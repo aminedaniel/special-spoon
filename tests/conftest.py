@@ -39,15 +39,20 @@ def make_fundamentals(tickers: list[str] = TICKERS) -> pd.DataFrame:
             "grossMargins": 0.6,
             "operatingCashflow": cap * 0.05,
             "netIncomeToCommon": cap * 0.03,
+            "priceToSalesTrailing12Months": ps,
+            "enterpriseToRevenue": ps * 0.95,
+            "enterpriseToEbitda": ps * 4,
+            "pegRatio": peg,
+            "freeCashflow": cap * 0.04,
             "sector": "Technology",
             "shortName": f"{t} Corp",
         }
-        for t, cap, pe, growth, dte, roe in [
-            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25),
-            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15),
-            ("CCCC", 8e8, None, 0.60, 10.0, -0.05),   # unprofitable grower
-            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10),
-            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08),
+        for t, cap, pe, growth, dte, roe, ps, peg in [
+            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25, 4.0, 1.2),
+            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15, 8.0, 2.0),
+            ("CCCC", 8e8, None, 0.60, 10.0, -0.05, 3.0, 1.0),   # unprofitable grower
+            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10, 12.0, 3.5),
+            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08, 1.5, None),  # cheap, no PEG
         ]
     }
     df = pd.DataFrame.from_dict(rows, orient="index")

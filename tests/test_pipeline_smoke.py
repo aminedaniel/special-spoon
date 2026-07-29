@@ -16,8 +16,9 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.23,
-            "technical": 0.23,
+            "fundamentals": 0.15,
+            "valuation": 0.10,
+            "technical": 0.21,
             "insider": 0.15,
             "congress": 0.05,
             "quality": 0.10,
@@ -86,6 +87,7 @@ def test_full_run_includes_stage_b(
 
     result = run(_config(), skip_stage_b=False)
 
+    assert "score_valuation" in result.rankings.columns
     assert "score_insider" in result.rankings.columns
     assert "score_congress" in result.rankings.columns
     assert "score_events" in result.rankings.columns

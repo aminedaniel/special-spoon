@@ -5,9 +5,10 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.23 | Yahoo Finance via `yfinance` |
-| Fundamentals (P/E, growth, debt, ROE, margins) | 0.23 | Yahoo Finance via `yfinance` |
+| Technicals (trend, momentum, RSI, breakout, volume) | 0.21 | Yahoo Finance via `yfinance` |
+| Fundamentals (growth, debt, ROE, margins) | 0.15 | Yahoo Finance via `yfinance` |
 | Insider activity (net open-market Form 4 dollars) | 0.15 | SEC EDGAR issuer submissions + Form 4 XML |
+| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.10 | Yahoo Finance via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.10 | Yahoo Finance financial fields + share history |
 | Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.09 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |

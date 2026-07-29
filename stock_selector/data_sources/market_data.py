@@ -26,6 +26,12 @@ FUNDAMENTAL_FIELDS = [
     "grossMargins",
     "operatingCashflow",
     "netIncomeToCommon",
+    # valuation multiples (for the valuation signal)
+    "priceToSalesTrailing12Months",
+    "enterpriseToRevenue",
+    "enterpriseToEbitda",
+    "pegRatio",
+    "freeCashflow",
     "sector",
     "shortName",
 ]
