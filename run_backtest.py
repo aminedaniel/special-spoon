@@ -92,8 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    # Date-stamp every artifact so separate runs don't clobber each other.
-    stem = f"backtest_{args.start}_{args.end}"
+    # Stamp dates AND the parameters that change the result, so variant runs
+    # over the same date range (different top-n or rebalance cadence) don't
+    # clobber each other.
+    stem = f"backtest_{args.start}_{args.end}_top{args.top_n}_{args.step_weeks}w"
     md_path = args.output_dir / f"{stem}.md"
     md_path.write_text(render_markdown(result, args.top_n, args.step_weeks))
     result.periods.to_csv(args.output_dir / f"{stem}_periods.csv", index=False)
