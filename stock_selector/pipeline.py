@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class PipelineResult:
     rankings: pd.DataFrame          # full scored shortlist, best first
-    regime: dict                    # macro regime panel
+    regime: dict | None             # macro regime panel; None = nothing to show
     universe_size: int
     gated_size: int
     skipped: int
