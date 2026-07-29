@@ -1,4 +1,9 @@
-"""Fundamentals signal: value + growth + balance-sheet quality, 0-100."""
+"""Fundamentals signal: growth + balance-sheet quality, 0-100.
+
+Valuation multiples (P/E, P/S, EV/…) live in the separate `valuation` signal,
+so this category isn't double-counting cheapness — it scores business quality
+(growth, returns, leverage, margins) independent of price.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +14,9 @@ from .base import combine_subscores, percentile_score
 
 
 def score(fundamentals: pd.DataFrame) -> pd.Series:
-    """Score fundamentals cross-sectionally.
+    """Score business quality cross-sectionally (price/valuation excluded).
 
     Sub-signals (each percentile-ranked, then averaged):
-      - trailingPE: lower is better (negative/absent PE -> NaN, unranked)
       - revenueGrowth: higher is better
       - debtToEquity: lower is better
       - returnOnEquity: higher is better
@@ -21,11 +25,7 @@ def score(fundamentals: pd.DataFrame) -> pd.Series:
     """
     f = fundamentals
 
-    pe = pd.to_numeric(f.get("trailingPE"), errors="coerce")
-    pe = pe.where(pe > 0)  # negative earnings -> no PE signal
-
     subs = pd.DataFrame(index=f.index)
-    subs["pe"] = percentile_score(pe, higher_is_better=False)
     subs["revenue_growth"] = percentile_score(
         pd.to_numeric(f.get("revenueGrowth"), errors="coerce")
     )
