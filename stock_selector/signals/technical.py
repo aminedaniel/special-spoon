@@ -1,5 +1,12 @@
-"""Technical signal: trend, momentum, RSI positioning, breakout proximity,
-and volume trend — all hand-rolled in pandas from daily OHLCV."""
+"""Technical signal: 12-1 momentum, trend, breakout proximity, volume trend.
+
+Reworked around what actually replicates. Classic oscillator indicators
+(RSI, MACD) have no robust standalone edge in the cross-sectional literature;
+what does is *intermediate-term momentum measured with the most recent month
+excluded* — the 12-1 convention (Jegadeesh & Titman 1993) — because the last
+month is contaminated by short-term reversal. The old RSI sweet-spot and
+1-month momentum subscores are gone for exactly that reason.
+"""
 
 from __future__ import annotations
 
@@ -11,19 +18,15 @@ from .base import combine_subscores, percentile_score
 TRADING_DAYS_1M = 21
 TRADING_DAYS_3M = 63
 TRADING_DAYS_6M = 126
+TRADING_DAYS_12M = 252
 
 
-def rsi(close: pd.Series, window: int = 14) -> pd.Series:
-    """Wilder's RSI."""
-    delta = close.diff()
-    gain = delta.clip(lower=0.0)
-    loss = -delta.clip(upper=0.0)
-    avg_gain = gain.ewm(alpha=1 / window, min_periods=window, adjust=False).mean()
-    avg_loss = loss.ewm(alpha=1 / window, min_periods=window, adjust=False).mean()
-    rs = avg_gain / avg_loss
-    out = 100 - (100 / (1 + rs))
-    # flat-loss edge case: all-gain windows -> RSI 100
-    return out.where(avg_loss != 0, 100.0)
+def momentum_12_1(close: pd.Series) -> float:
+    """Total return from ~12 months ago to ~1 month ago, skipping the most
+    recent month (short-term reversal). With less than a year of history the
+    base clamps to the earliest close available."""
+    base_idx = -min(len(close), TRADING_DAYS_12M)
+    return float(close.iloc[-TRADING_DAYS_1M] / close.iloc[base_idx] - 1)
 
 
 def _per_ticker_features(close: pd.Series, volume: pd.Series) -> dict[str, float]:
@@ -41,18 +44,11 @@ def _per_ticker_features(close: pd.Series, volume: pd.Series) -> dict[str, float
     if not np.isnan(sma200):
         feats["sma50_over_sma200"] = float(sma50 > sma200)
 
-    # Momentum: simple total returns over 1/3/6 months
-    feats["mom_1m"] = last / close.iloc[-TRADING_DAYS_1M] - 1
-    feats["mom_3m"] = last / close.iloc[-TRADING_DAYS_3M] - 1
-    feats["mom_6m"] = last / close.iloc[-TRADING_DAYS_6M] - 1
-
-    # RSI sweet spot: prefer 50-70 (uptrend, not overbought).
-    r = rsi(close).iloc[-1]
-    if not np.isnan(r):
-        feats["rsi_sweet"] = -abs(r - 60.0)  # peak score at RSI 60
+    # The momentum that replicates: 12 months, most recent month excluded.
+    feats["mom_12_1"] = momentum_12_1(close)
 
     # Breakout proximity: distance below 52-week high (closer is better)
-    high_52w = close.iloc[-252:].max() if len(close) >= 252 else close.max()
+    high_52w = close.iloc[-TRADING_DAYS_12M:].max()
     feats["breakout_proximity"] = last / high_52w - 1  # <= 0, closer to 0 is better
 
     # Volume trend: recent 21d avg volume vs prior 63d avg

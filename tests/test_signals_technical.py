@@ -3,25 +3,29 @@
 import numpy as np
 import pandas as pd
 
-from stock_selector.signals.technical import rsi, score
+from stock_selector.signals.technical import momentum_12_1, score
 
 
-def test_rsi_all_gains_is_100():
-    close = pd.Series(np.arange(1.0, 40.0))  # strictly rising
-    assert rsi(close).iloc[-1] == 100.0
+def test_momentum_12_1_hand_computed():
+    # 300 days doubling linearly; 12-1 momentum ends at day -21, bases at -252.
+    close = pd.Series(np.linspace(100.0, 200.0, num=300))
+    expected = close.iloc[-21] / close.iloc[-252] - 1
+    assert momentum_12_1(close) == expected
 
 
-def test_rsi_all_losses_near_zero():
-    close = pd.Series(np.arange(40.0, 1.0, -1.0))  # strictly falling
-    assert rsi(close).iloc[-1] < 1.0
+def test_momentum_12_1_short_history_clamps_to_start():
+    close = pd.Series(np.linspace(100.0, 150.0, num=180))
+    expected = close.iloc[-21] / close.iloc[0] - 1
+    assert momentum_12_1(close) == expected
 
 
-def test_rsi_alternating_is_moderate():
-    # Equal up/down moves -> RSI near 50
-    moves = np.tile([1.0, -1.0], 50)
-    close = pd.Series(100 + np.cumsum(moves))
-    value = rsi(close).iloc[-1]
-    assert 40 <= value <= 60
+def test_momentum_12_1_ignores_last_month_crash():
+    """A crash entirely inside the most recent month must not change 12-1
+    momentum — that window is excluded by construction (short-term reversal)."""
+    steady = pd.Series(np.linspace(100.0, 200.0, num=300))
+    crashed = steady.copy()
+    crashed.iloc[-20:] = 50.0  # collapse strictly inside the skipped month
+    assert momentum_12_1(crashed) == momentum_12_1(steady)
 
 
 def test_score_ranks_uptrend_over_downtrend(price_history):

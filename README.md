@@ -6,7 +6,7 @@ them by a weighted composite of:
 | Signal | Base weight | Source (all free) |
 |---|---|---|
 | Earnings drift / PEAD (standardized earnings surprise) | 0.12 | Yahoo Finance earnings dates via `yfinance` |
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.10 | Yahoo Finance via `yfinance` |
+| Technicals (12-1 momentum, trend, breakout, volume) | 0.10 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.12 | Yahoo Finance via `yfinance` |
 | Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.08 | Yahoo Finance statements via `yfinance` |
 | Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.16 | SEC EDGAR issuer submissions + Form 4 XML |
