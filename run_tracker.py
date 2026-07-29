@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
         "--rankings", type=Path, default=None,
         help="Rankings CSV to read top picks from (default: newest in reports-dir)",
     )
-    parser.add_argument("--top-n", type=int, default=2)
+    parser.add_argument("--top-n", type=int, default=1)
     parser.add_argument(
         "--backfill", action="store_true",
         help="Seed the ledger from all past rankings_*.csv using historical closes",

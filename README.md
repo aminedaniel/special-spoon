@@ -74,20 +74,20 @@ insider analysis and the recommendation tracker shortly after the workflow finis
 
 ### Recommendation tracker
 
-A running ledger of the **top-2 picks**, updated **weekly (Mondays)**: each new
-top-2 name is anchored once — to the date and price at which the screener first
-recommended it — and never re-dated, even if it drops out of the top 2 and returns.
+A running ledger of the **week's #1 pick**, updated **weekly (Mondays)**: each new
+top pick is anchored once — to the date and price at which the screener first
+recommended it — and never re-dated, even if it leaves the top spot and returns later.
 Each run refreshes the current price and shows the change since first recommendation.
 Output: `reports/recommendations.md` (readable table) and `recommendations.csv` (the
 durable ledger). Run manually with `python run_tracker.py --reports-dir reports`.
 
 To seed the ledger from existing reports using historical closes on each report date,
-run the workflow manually (Actions tab → "Daily stock report" → Run workflow →
+run the workflow manually (Actions tab → "Weekly stock report" → Run workflow →
 `backfill_tracker: true`), or locally: `python run_tracker.py --reports-dir reports --backfill`.
 
 Distinct from the scoreboard below: the scoreboard grades a *cohort* (each week's full
-top-N return vs benchmarks) to tune weights; the tracker follows *individual names* from
-first pickup so you can watch a specific pick over time.
+top-N return vs benchmarks) to tune weights; the tracker follows the *single top pick*
+from first recommendation so you can watch how it plays out.
 
 ### Performance scoreboard
 

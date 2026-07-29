@@ -35,10 +35,10 @@ jobs:
         run: python run_scoreboard.py --reports-dir reports
       - name: Backfill recommendation tracker (manual, one-time)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_tracker }}
-        run: python run_tracker.py --reports-dir reports --top-n 2 --backfill
+        run: python run_tracker.py --reports-dir reports --top-n 1 --backfill
       - name: Update recommendation tracker
         if: ${{ github.event_name == 'schedule' }}
-        run: python run_tracker.py --reports-dir reports --top-n 2
+        run: python run_tracker.py --reports-dir reports --top-n 1
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
