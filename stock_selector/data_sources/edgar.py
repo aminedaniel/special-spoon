@@ -84,6 +84,8 @@ class EdgarClient:
                 "accessionNumber": col("accessionNumber")[i],
                 "primaryDocument": col("primaryDocument")[i],
                 "items": col("items")[i],
+                # US-Eastern wall-clock stamp, used by the 8-K timing flag
+                "acceptanceDateTime": col("acceptanceDateTime")[i],
             }
             for i in range(n)
         ]
