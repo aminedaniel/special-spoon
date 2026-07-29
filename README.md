@@ -9,8 +9,8 @@ them by a weighted composite of:
 | Technicals (12-1 momentum, trend, breakout, volume) | 0.09 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.11 | Yahoo Finance via `yfinance` |
 | Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.07 | Yahoo Finance statements via `yfinance` |
-| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.13 | SEC EDGAR issuer submissions + Form 4 XML |
-| Stability (low beta vs QQQ + low idiosyncratic vol) | 0.07 | Yahoo Finance via `yfinance` |
+| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | **0.18** | SEC EDGAR issuer submissions + Form 4 XML |
+| Stability (low beta vs QQQ + low idiosyncratic vol) | 0.02 | Yahoo Finance via `yfinance` |
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.08 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.06 | Yahoo Finance via `yfinance` |
@@ -22,6 +22,23 @@ them by a weighted composite of:
 Weights are *base* weights: once enough graded history accumulates, the scoreboard
 tilts them toward signals with demonstrated predictive power (see "Adaptive
 reweighting" below).
+
+Two of them are now set by **measurement rather than literature** — the 27-period
+walk-forward backtest (2024-07 → 2026-07) grades signals on non-overlapping forward
+returns, so its ICs are the statistically sound ones:
+
+| Signal | Measured IC | t | Verdict |
+|---|---|---|---|
+| insider | **+0.068** | +1.96 | best in the set; weight raised 0.13 → 0.18 |
+| technical | +0.029 | +0.61 | weak, right sign; held at 0.09 |
+| earnings_drift | +0.001 | +0.03 | flat, but only ~20 names score per period; held |
+| events | −0.002 | −0.10 | flat — measured *before* the shelf/timing fixes |
+| stability | **−0.077** | −1.49 | **backwards in this regime**; cut 0.07 → 0.02 |
+
+Stability was floored rather than removed: one momentum-led small-cap regime is not
+proof the low-risk anomaly is absent, and a zero weight can never earn its way back.
+The remaining seven signals cannot be backtested on free data (current-snapshot only),
+so their weights still rest on published evidence alone.
 
 The macro signal is deliberately **contextual, not weighted** — a market-wide value is
 identical for every ticker and cannot change relative rankings; it renders as a
