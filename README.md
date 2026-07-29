@@ -25,7 +25,14 @@ reweighting" below).
 
 The macro signal is deliberately **contextual, not weighted** — a market-wide value is
 identical for every ticker and cannot change relative rankings; it renders as a
-"Market regime" panel instead.
+"Market regime" panel instead. `FRED_API_KEY` is therefore genuinely optional: without
+it the panel is simply omitted and *every pick is identical*. Set it only if you want
+the fed-funds/curve/VIX readout printed alongside the picks.
+
+(The one way macro could legitimately move rankings is regime-*conditional weighting* —
+switching the weight vector in stressed regimes rather than adding a market-wide score.
+Not implemented: regimes are rare, so a rule like that would be fitted on a handful of
+effective observations, which is how backtests get flattered.)
 
 ## How it works
 
@@ -79,9 +86,10 @@ Two GitHub Actions workflows:
   submissions feed actually contains for a few tickers, so signal behaviour can be
   checked against live data instead of guessed at (`scripts/diagnose_edgar.py`).
 
-Add two repository secrets (Settings → Secrets and variables → Actions) for full
-signal coverage: `FRED_API_KEY` and `SEC_EDGAR_USER_AGENT`. Without them the run
-still works but skips the insider/events/filing-text signals and macro panel.
+Add `SEC_EDGAR_USER_AGENT` as a repository secret (Settings → Secrets and variables →
+Actions) — it unlocks the insider, corporate-event, and filing-text signals, 0.29 of the
+weight budget. `FRED_API_KEY` is optional and affects only the contextual regime panel,
+never the ranking.
 
 Delivery (Claude Routine, Monday 16:00 UTC) posts the full analyst deep dive +
 insider analysis and the recommendation tracker shortly after the workflow finishes.

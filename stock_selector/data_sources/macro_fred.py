@@ -42,14 +42,18 @@ def _latest_observations(series_id: str, api_key: str, count: int = 90) -> list[
     return values  # newest first
 
 
-def fetch_regime(api_key: str | None) -> dict:
-    """Return {"label": str, "detail": {...}} describing the macro regime.
+def fetch_regime(api_key: str | None) -> dict | None:
+    """Return {"label": str, "detail": {...}} describing the macro regime,
+    or None when there is nothing to say.
 
-    Fails soft: without a key or on any error, returns an 'unavailable' label
-    so the report still renders.
+    None rather than an "unavailable" label, matching the convention every
+    scored signal uses: absent data is absent, not a finding. The regime panel
+    is contextual and cannot move a single rank, so a missing key is not a
+    degraded run and the report should not imply otherwise.
     """
     if not api_key:
-        return {"label": "unavailable (no FRED_API_KEY set)", "detail": {}}
+        log.info("no FRED_API_KEY set; skipping the macro regime panel")
+        return None
     try:
         fed = _latest_observations(SERIES["fed_funds"], api_key)
         curve = _latest_observations(SERIES["yield_curve_10y2y"], api_key)
@@ -84,4 +88,4 @@ def fetch_regime(api_key: str | None) -> dict:
         return {"label": label, "detail": detail}
     except Exception as exc:  # noqa: BLE001 — macro context is optional
         log.warning("FRED fetch failed: %s", exc)
-        return {"label": "unavailable (FRED error)", "detail": {}}
+        return None

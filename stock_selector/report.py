@@ -11,10 +11,9 @@ from .pipeline import PipelineResult
 
 DISCLAIMER = (
     "*This is an automated screen for research purposes, not investment advice. "
-    "Congressional trades are disclosed with a 30-45 day STOCK Act lag, so that "
-    "signal reflects trades made weeks earlier. Data comes from free sources "
-    "(Yahoo Finance, SEC EDGAR, Senate/House Stock Watcher, FRED) with no "
-    "accuracy guarantee.*"
+    "Data comes from free sources (Yahoo Finance, SEC EDGAR, Google Trends, FRED) "
+    "with no accuracy guarantee. Insider and corporate-event signals reflect SEC "
+    "filings, which are themselves lagged by each form's disclosure deadline.*"
 )
 
 
@@ -34,12 +33,14 @@ def render_markdown(result: PipelineResult, top_n: int, run_date: date) -> str:
     r = result.rankings.head(top_n)
     score_cols = [c for c in result.rankings.columns if c.startswith("score_")]
 
-    lines = [
-        f"# Stock Selector — {run_date.isoformat()}",
-        "",
-        f"**Market regime:** {result.regime.get('label', 'unavailable')}",
-    ]
-    detail = result.regime.get("detail") or {}
+    lines = [f"# Stock Selector — {run_date.isoformat()}", ""]
+    # No regime data is not a fault worth announcing: macro is contextual only
+    # and cannot move a single rank, so an absent panel is simply absent rather
+    # than a scary "unavailable" line at the top of every report.
+    regime = result.regime or {}
+    if regime.get("label"):
+        lines.append(f"**Market regime:** {regime['label']}")
+    detail = regime.get("detail") or {}
     if detail:
         parts = []
         if detail.get("fed_funds") is not None:
