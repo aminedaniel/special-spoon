@@ -17,6 +17,7 @@ from pathlib import Path
 
 from stock_selector.backtest import (
     BENCHMARKS,
+    collect_earnings_histories,
     collect_edgar_histories,
     render_markdown,
     run_backtest,
@@ -61,8 +62,10 @@ def main(argv: list[str] | None = None) -> int:
         tickers=universe, start=fetch_start, interval="1d",
         group_by="column", auto_adjust=True, threads=True, progress=False,
     )
+    # Benchmarks from fetch_start too: the stability signal needs a trailing
+    # year of QQQ *before* the first rebalance to estimate betas there.
     bench = yf.download(
-        tickers=BENCHMARKS, start=args.start.isoformat(), interval="1d",
+        tickers=BENCHMARKS, start=fetch_start, interval="1d",
         auto_adjust=True, progress=False,
     )["Close"]
 
@@ -75,7 +78,13 @@ def main(argv: list[str] | None = None) -> int:
             include_filing_text=args.include_filing_text,
         )
     else:
-        print("WARNING: SEC_EDGAR_USER_AGENT not set — technical-only backtest")
+        print(
+            "WARNING: SEC_EDGAR_USER_AGENT not set — insider/events/filing-text "
+            "will not be scored (technical/stability/earnings-drift still run)"
+        )
+    # Attach after the EDGAR branch: that call builds a fresh dict and would
+    # otherwise silently drop the earnings histories.
+    histories["earnings"] = collect_earnings_histories(universe)
 
     result = run_backtest(
         universe=universe,

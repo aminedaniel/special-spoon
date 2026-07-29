@@ -1,14 +1,17 @@
 """Walk-forward backtest over point-in-time signals.
 
 Only signals that are truly reconstructable as-of a past date participate:
-  - technical: computed from price history sliced at the rebalance date
-  - insider:   Form 4 filings dated on/before the rebalance date
-  - events:    13D/13G/S-3/8-K filings dated on/before the rebalance date
+  - technical:      price history sliced at the rebalance date
+  - stability:      trailing-year beta/idio-vol from the same sliced prices
+  - earnings_drift: dated announcements (estimate + reported EPS) on/before
+                    the rebalance date, via the same surprise_asof used live
+  - insider:        Form 4 filings dated on/before the rebalance date
+  - events:         13D/13G/shelf/8-K filings dated on/before the date
   - filing_text (opt-in, document-heavy): periodic reports filed by the date
 
-Fundamentals and quality are EXCLUDED: free sources only serve
-current snapshots for those, and scoring the past with today's data is
-lookahead bias dressed up as results.
+Fundamentals, valuation, quality, short interest, and trends are EXCLUDED:
+free sources only serve current snapshots for those, and scoring the past
+with today's data is lookahead bias dressed up as results.
 
 Each rebalance: score the universe as-of that date -> take top N -> hold to
 the next rebalance -> record equal-weight return vs benchmarks, plus each
@@ -30,23 +33,28 @@ from datetime import date, timedelta
 import pandas as pd
 
 from . import adaptive
-from .data_sources import edgar_filings, sec_insider
+from .data_sources import earnings, edgar_filings, sec_insider
 from .data_sources.edgar import EdgarClient
 from .scoring import composite_score
+from .signals import earnings_drift as earnings_drift_signal
 from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import insider as insider_signal
+from .signals import stability as stability_signal
 from .signals import technical as technical_signal
 
 log = logging.getLogger(__name__)
 
 BENCHMARKS = ["QQQ", "IWM"]
 BACKTEST_WEIGHTS = {  # base weights over the point-in-time signal set
-    "technical": 0.5,
-    "insider": 0.2,
-    "events": 0.2,
-    "filing_text": 0.1,
+    "technical": 0.30,
+    "insider": 0.20,
+    "earnings_drift": 0.15,
+    "events": 0.15,
+    "stability": 0.10,
+    "filing_text": 0.10,
 }
+STABILITY_LOOKBACK_DAYS = 365  # match the live signal's ~1y beta window
 
 
 @dataclass
@@ -90,6 +98,24 @@ def technical_scores_asof(prices: pd.DataFrame, as_of: date) -> pd.Series:
     return technical_signal.score(prices[mask])
 
 
+def stability_scores_asof(
+    prices: pd.DataFrame, bench_close: pd.Series | None, as_of: date
+) -> pd.Series:
+    """Trailing-year beta/idio-vol as-of a date, reusing the live signal.
+
+    The window is a *trailing* slice, not everything-to-date: the live run
+    sees ~1y of history, and letting the estimation window grow with the
+    backtest would quietly change what "beta" means at later rebalances.
+    """
+    lo = as_of - timedelta(days=STABILITY_LOOKBACK_DAYS)
+    mask = (prices.index.date > lo) & (prices.index.date <= as_of)
+    bench = None
+    if bench_close is not None:
+        b = bench_close.dropna()
+        bench = b[(b.index.date > lo) & (b.index.date <= as_of)]
+    return stability_signal.score(prices[mask], bench)
+
+
 def collect_edgar_histories(
     client: EdgarClient,
     tickers: list[str],
@@ -116,16 +142,25 @@ def collect_edgar_histories(
     return {"form4": form4, "filings": filings, "text_cache": {} if include_filing_text else None}
 
 
+def collect_earnings_histories(tickers: list[str]) -> dict:
+    """Dated earnings frames per ticker, fetched once and windowed per
+    rebalance by surprise_asof (network call — CLI-side, not in the pure loop)."""
+    log.info("Fetching earnings-date history for %d tickers", len(tickers))
+    return earnings.fetch_earnings_history(tickers)
+
+
 def scores_asof(
     as_of: date,
     prices: pd.DataFrame,
     histories: dict,
     client: EdgarClient | None,
     include_filing_text: bool,
+    bench_close: pd.Series | None = None,
 ) -> dict[str, pd.Series]:
     tickers = list(histories["form4"].keys())
     out: dict[str, pd.Series] = {
         "technical": technical_scores_asof(prices, as_of).reindex(tickers),
+        "stability": stability_scores_asof(prices, bench_close, as_of).reindex(tickers),
         "insider": insider_signal.score(
             {
                 t: sec_insider.window_activity(
@@ -145,6 +180,17 @@ def scores_asof(
             }
         ),
     }
+    if histories.get("earnings") is not None:
+        out["earnings_drift"] = earnings_drift_signal.score(
+            {
+                t: (
+                    earnings.surprise_asof(f, as_of)
+                    if (f := histories["earnings"].get(t)) is not None
+                    else None
+                )
+                for t in tickers
+            }
+        )
     if include_filing_text and client is not None:
         out["filing_text"] = filing_text_signal.score(
             edgar_filings.fetch_filing_similarity(
@@ -171,10 +217,13 @@ def run_backtest(
     base = dict(BACKTEST_WEIGHTS)
     if not include_filing_text:
         base.pop("filing_text")
+    if histories.get("earnings") is None:
+        base.pop("earnings_drift")
     total = sum(base.values())
     base = {k: v / total for k, v in base.items()}
 
     closes = prices["Close"]
+    qqq_close = bench_closes["QQQ"] if "QQQ" in bench_closes.columns else None
     dates = rebalance_dates(start, end, step_weeks)
     period_rows, pick_rows, ic_rows, weight_rows = [], [], [], []
     ic_history = pd.DataFrame()
@@ -185,7 +234,9 @@ def run_backtest(
             if adaptive_weights and not ic_history.empty
             else base
         )
-        cat_scores = scores_asof(d, prices, histories, client, include_filing_text)
+        cat_scores = scores_asof(
+            d, prices, histories, client, include_filing_text, bench_close=qqq_close
+        )
         ranked = composite_score(cat_scores, weights)
         picks = ranked.dropna(subset=["composite"]).head(top_n)
         hold_end = d + timedelta(weeks=step_weeks)
@@ -317,9 +368,10 @@ def render_markdown(result: BacktestResult, top_n: int, step_weeks: int) -> str:
         "---",
         "",
         "*Caveats: survivorship bias (today's universe excludes delisted names, "
-        "inflating absolute returns); fundamentals/quality/valuation signals are "
-        "excluded because free sources only provide current snapshots (using them "
-        "historically would be lookahead). Research output, not investment advice.*",
+        "inflating absolute returns); fundamentals/valuation/quality/short-interest/"
+        "trends signals are excluded because free sources only provide current "
+        "snapshots (using them historically would be lookahead). Research output, "
+        "not investment advice.*",
         "",
     ]
     return "\n".join(lines)

@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 DRIFT_WINDOW_DAYS = 75
 MIN_PRIOR_SURPRISES = 4   # below this, fall back to the raw surprise pct
 MAX_QUARTERS = 12
+# The backtest needs enough quarters to cover its whole window plus the
+# prior-surprise baseline used by the SUE scaling.
+BACKTEST_QUARTERS = 24
 BATCH_PAUSE_EVERY = 25
 BATCH_PAUSE_SECS = 1.0
 
@@ -73,7 +76,7 @@ def fetch_earnings_surprise(
             continue
         if frame is None or frame.empty:
             continue
-        parsed = _latest_in_window(frame, as_of)
+        parsed = surprise_asof(frame, as_of)
         if parsed is not None:
             out[ticker] = parsed
         if (i + 1) % BATCH_PAUSE_EVERY == 0:
@@ -83,7 +86,30 @@ def fetch_earnings_surprise(
     return out
 
 
-def _latest_in_window(frame: pd.DataFrame, as_of: date) -> dict | None:
+def fetch_earnings_history(
+    tickers: list[str], limit: int = BACKTEST_QUARTERS
+) -> dict[str, pd.DataFrame | None]:
+    """Raw dated earnings frames per ticker, fetched once for the backtest.
+
+    Every row is a dated announcement with its estimate and reported EPS, so
+    `surprise_asof` can reconstruct the signal at any past rebalance without
+    lookahead — the same code path the weekly run uses for 'today'.
+    """
+    out: dict[str, pd.DataFrame | None] = {}
+    for i, ticker in enumerate(tickers):
+        out[ticker] = None
+        try:
+            frame = yf.Ticker(ticker).get_earnings_dates(limit=limit)
+            if frame is not None and not frame.empty:
+                out[ticker] = frame
+        except Exception as exc:  # noqa: BLE001 — per-ticker failures are non-fatal
+            log.debug("earnings history failed for %s: %s", ticker, exc)
+        if (i + 1) % BATCH_PAUSE_EVERY == 0:
+            time.sleep(BATCH_PAUSE_SECS)
+    return out
+
+
+def surprise_asof(frame: pd.DataFrame, as_of: date) -> dict | None:
     """Extract the newest reported announcement within the drift window."""
     f = frame.copy()
     f.index = pd.to_datetime(f.index).tz_localize(None)
