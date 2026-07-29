@@ -32,6 +32,10 @@ FUNDAMENTAL_FIELDS = [
     "enterpriseToEbitda",
     "pegRatio",
     "freeCashflow",
+    # short interest (for the short_interest signal) — rides along free
+    "sharesShort",
+    "sharesShortPriorMonth",
+    "shortPercentOfFloat",
     "sector",
     "shortName",
 ]

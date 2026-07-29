@@ -44,15 +44,18 @@ def make_fundamentals(tickers: list[str] = TICKERS) -> pd.DataFrame:
             "enterpriseToEbitda": ps * 4,
             "pegRatio": peg,
             "freeCashflow": cap * 0.04,
+            "sharesShort": short_now,
+            "sharesShortPriorMonth": short_prior,
+            "shortPercentOfFloat": short_pct,
             "sector": "Technology",
             "shortName": f"{t} Corp",
         }
-        for t, cap, pe, growth, dte, roe, ps, peg in [
-            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25, 4.0, 1.2),
-            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15, 8.0, 2.0),
-            ("CCCC", 8e8, None, 0.60, 10.0, -0.05, 3.0, 1.0),   # unprofitable grower
-            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10, 12.0, 3.5),
-            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08, 1.5, None),  # cheap, no PEG
+        for t, cap, pe, growth, dte, roe, ps, peg, short_pct, short_now, short_prior in [
+            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25, 4.0, 1.2, 0.02, 1e6, 1.2e6),
+            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15, 8.0, 2.0, 0.06, 3e6, 2.8e6),
+            ("CCCC", 8e8, None, 0.60, 10.0, -0.05, 3.0, 1.0, 0.12, 5e6, 4e6),   # unprofitable grower
+            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10, 12.0, 3.5, 0.25, 9e6, 5e6),
+            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08, 1.5, None, None, None, None),  # cheap, no PEG/short data
         ]
     }
     df = pd.DataFrame.from_dict(rows, orient="index")

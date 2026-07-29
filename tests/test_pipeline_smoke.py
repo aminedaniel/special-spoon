@@ -21,11 +21,12 @@ def _config() -> Config:
             "profitability": 0.08,
             "technical": 0.10,
             "earnings_drift": 0.12,
-            "insider": 0.16,
-            "quality": 0.11,
-            "events": 0.09,
+            "insider": 0.14,
+            "quality": 0.10,
+            "short_interest": 0.07,
+            "events": 0.08,
             "filing_text": 0.08,
-            "trends": 0.08,
+            "trends": 0.05,
         },
         thresholds={"min_market_cap": 1e8, "max_market_cap": 20e9, "max_pe": 60},
         top_n=3,
@@ -111,6 +112,7 @@ def test_full_run_includes_stage_b(
 
     assert "score_valuation" in result.rankings.columns
     assert "score_profitability" in result.rankings.columns
+    assert "score_short_interest" in result.rankings.columns
     assert "score_insider" in result.rankings.columns
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
