@@ -1,10 +1,20 @@
 """Corporate-event flags and filing-language similarity from EDGAR.
 
 Events (point-in-time from the submissions feed, no document fetches):
-  +2  SC 13D / 13D/A        activist stake with intent to influence
-  +1  SC 13G / 13G/A        passive >5% stake crossing
-  -1  S-3 / S-3/A           shelf registration (dilution risk)
-  -2  8-K with item 4.02    previously issued financials can't be relied on
+  +2    SC 13D / 13D/A      activist stake with intent to influence
+  +1    SC 13G / 13G/A      passive >5% stake crossing
+  -1    S-3 family          shelf registration (dilution risk)
+  -2    8-K with item 4.02  previously issued financials can't be relied on
+  -0.5  8-K dumped Friday after hours / weekend (news-timing red flag)
+
+The shelf match covers the whole family — the live diagnostic found zero
+plain "S-3" strings across nine issuers' decade-long feeds because real
+filers use the variants: S-3ASR (well-known seasoned issuers' automatic
+shelves), S-3MEF, and F-3/F-3ASR for foreign private issuers.
+
+The Friday flag is the disclosure-timing effect (deHaan/Shevlin/Thornock):
+managers strategically file bad news when nobody is watching — after the
+close on Friday or on weekends — and the market underreacts to it.
 
 Filing text ("lazy prices"): similarity between the issuer's two most recent
 same-form periodic reports (10-Q vs prior 10-Q, else 10-K vs prior 10-K).
@@ -32,9 +42,32 @@ EVENT_POINTS = {
     "SC 13D/A": 2.0,
     "SC 13G": 1.0,
     "SC 13G/A": 1.0,
-    "S-3": -1.0,
-    "S-3/A": -1.0,
 }
+# The whole shelf family, not just plain S-3 — see module docstring.
+SHELF_FORMS = {"S-3", "S-3/A", "S-3ASR", "S-3MEF", "F-3", "F-3/A", "F-3ASR"}
+SHELF_POINTS = -1.0
+QUIET_DUMP_POINTS = -0.5   # 8-K accepted Friday post-16:00 ET or on a weekend
+_ACCEPT_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})")
+
+
+def is_quiet_dump(acceptance: str | None) -> bool:
+    """True when an acceptanceDateTime lands Friday after 16:00 ET or on a
+    weekend — the classic burying-the-news slot.
+
+    EDGAR acceptance stamps are US-Eastern wall-clock time, so no timezone
+    math is needed. Malformed/missing stamps are False (no evidence).
+    """
+    if not acceptance:
+        return False
+    m = _ACCEPT_RE.match(acceptance)
+    if not m:
+        return False
+    try:
+        d = date.fromisoformat(m.group(1))
+    except ValueError:
+        return False
+    weekday, hour = d.weekday(), int(m.group(2))
+    return weekday >= 5 or (weekday == 4 and hour >= 16)
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
@@ -56,14 +89,15 @@ def event_points(
         if not filed or filed > as_of_iso:
             continue
         form = f["form"]
-        if form in ("SC 13D", "SC 13D/A") and filed >= stake_cutoff:
+        if form in EVENT_POINTS and filed >= stake_cutoff:
             points += EVENT_POINTS[form]
-        elif form in ("SC 13G", "SC 13G/A") and filed >= stake_cutoff:
-            points += EVENT_POINTS[form]
-        elif form in ("S-3", "S-3/A") and filed >= shelf_cutoff:
-            points += EVENT_POINTS[form]
-        elif form == "8-K" and filed >= redflag_cutoff and "4.02" in (f["items"] or ""):
-            points -= 2.0
+        elif form in SHELF_FORMS and filed >= shelf_cutoff:
+            points += SHELF_POINTS
+        elif form == "8-K" and filed >= redflag_cutoff:
+            if "4.02" in (f["items"] or ""):
+                points -= 2.0
+            if is_quiet_dump(f.get("acceptanceDateTime")):
+                points += QUIET_DUMP_POINTS
     return points
 
 

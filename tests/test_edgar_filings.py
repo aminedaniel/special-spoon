@@ -4,6 +4,7 @@ from datetime import date
 
 from stock_selector.data_sources.edgar_filings import (
     event_points,
+    is_quiet_dump,
     latest_report_pair,
     shingle_similarity,
     strip_html,
@@ -12,13 +13,14 @@ from stock_selector.data_sources.edgar_filings import (
 AS_OF = date(2026, 7, 1)
 
 
-def _f(form, filed, items="", doc="doc.htm", accession="a"):
+def _f(form, filed, items="", doc="doc.htm", accession="a", accepted=None):
     return {
         "form": form,
         "filingDate": filed,
         "items": items,
         "primaryDocument": doc,
         "accessionNumber": accession,
+        "acceptanceDateTime": accepted,
     }
 
 
@@ -74,3 +76,35 @@ def test_shingle_similarity_identical_and_disjoint():
 def test_strip_html():
     html = "<p>Risk&nbsp;Factors</p>  <b>have</b>   changed"
     assert strip_html(html) == " risk factors have changed"
+
+
+def test_shelf_variants_all_count():
+    """The live diagnostic found zero plain "S-3" strings in a decade of
+    issuer feeds — real filers use S-3ASR / F-3 etc. All must score."""
+    for form in ("S-3", "S-3ASR", "S-3MEF", "F-3", "F-3ASR"):
+        assert event_points([_f(form, "2026-06-01")], AS_OF) == -1.0
+
+
+def test_quiet_dump_detection():
+    assert is_quiet_dump("2026-06-19T17:30:00")      # Friday after the close
+    assert is_quiet_dump("2026-06-20T09:00:00")      # Saturday
+    assert not is_quiet_dump("2026-06-19T10:00:00")  # Friday mid-session
+    assert not is_quiet_dump("2026-06-17T18:00:00")  # Wednesday evening
+    assert not is_quiet_dump(None)
+    assert not is_quiet_dump("garbage")
+
+
+def test_friday_night_8k_penalized():
+    quiet = event_points(
+        [_f("8-K", "2026-06-19", accepted="2026-06-19T17:45:00")], AS_OF
+    )
+    loud = event_points(
+        [_f("8-K", "2026-06-17", accepted="2026-06-17T09:00:00")], AS_OF
+    )
+    assert quiet == -0.5 and loud == 0.0
+    # A 4.02 dumped on Friday night stacks both penalties.
+    both = event_points(
+        [_f("8-K", "2026-06-19", items="4.02", accepted="2026-06-19T17:45:00")],
+        AS_OF,
+    )
+    assert both == -2.5
