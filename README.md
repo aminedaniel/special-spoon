@@ -5,7 +5,8 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (trend, momentum, RSI, breakout, volume) | 0.22 | Yahoo Finance via `yfinance` |
+| Earnings drift / PEAD (standardized earnings surprise) | 0.12 | Yahoo Finance earnings dates via `yfinance` |
+| Technicals (trend, momentum, RSI, breakout, volume) | 0.10 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.16 | Yahoo Finance via `yfinance` |
 | Insider activity (net open-market Form 4 dollars, trailing 90d) | 0.16 | SEC EDGAR issuer submissions + Form 4 XML |
 | Quality (accrual gap, share dilution) | 0.11 | Yahoo Finance financial fields + share history |
@@ -133,7 +134,9 @@ use only *prior* periods' ICs). Output: `output/backtest_*.md` with cumulative
 performance, per-signal predictive power, and the biggest wins ("gems") and losses.
 
 Only truly point-in-time signals participate: technical, insider, events, and
-(with `--include-filing-text`, document-heavy) filing language. Fundamentals,
+(with `--include-filing-text`, document-heavy) filing language. Earnings-drift is
+dated and therefore backtestable in principle — wiring it into the walk-forward
+loop is an open follow-up. Fundamentals,
 valuation, quality, and trends are excluded — free sources only serve
 *current* snapshots for those, and backtesting them with today's data would be
 lookahead bias. Results also carry survivorship bias: today's universe omits

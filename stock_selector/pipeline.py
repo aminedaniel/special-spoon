@@ -11,6 +11,7 @@ import pandas as pd
 
 from .config import Config
 from .data_sources import (
+    earnings,
     edgar_filings,
     google_trends,
     macro_fred,
@@ -19,6 +20,7 @@ from .data_sources import (
 )
 from .data_sources.edgar import EdgarClient
 from .scoring import apply_quality_gate, composite_score, degenerate_categories
+from .signals import earnings_drift as earnings_drift_signal
 from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import fundamentals as fundamentals_signal
@@ -95,6 +97,15 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
         category_scores["quality"] = quality_signal.score(
             gated.loc[gated.index.intersection(shortlist)], share_change
         )
+
+        surprises = earnings.fetch_earnings_surprise(shortlist)
+        if any(v is not None for v in surprises.values()):
+            category_scores["earnings_drift"] = earnings_drift_signal.score(surprises)
+        else:
+            notes.append(
+                "Earnings-drift signal unavailable: no ticker had a scorable "
+                "announcement in the drift window; its weight was redistributed"
+            )
 
         trends_momentum = google_trends.fetch_interest_momentum(shortlist)
         if any(v is not None for v in trends_momentum.values()):
