@@ -1,0 +1,88 @@
+ticker,name,sector
+AAPL,Apple Inc.,Technology
+MSFT,Microsoft Corporation,Technology
+NVDA,NVIDIA Corporation,Technology
+GOOGL,Alphabet Inc.,Communication Services
+META,Meta Platforms Inc.,Communication Services
+AVGO,Broadcom Inc.,Technology
+ORCL,Oracle Corporation,Technology
+CRM,Salesforce Inc.,Technology
+AMD,Advanced Micro Devices Inc.,Technology
+ADBE,Adobe Inc.,Technology
+CSCO,Cisco Systems Inc.,Technology
+ACN,Accenture plc,Technology
+INTU,Intuit Inc.,Technology
+IBM,International Business Machines,Technology
+TXN,Texas Instruments Incorporated,Technology
+QCOM,QUALCOMM Incorporated,Technology
+NOW,ServiceNow Inc.,Technology
+AMAT,Applied Materials Inc.,Technology
+MU,Micron Technology Inc.,Technology
+ADI,Analog Devices Inc.,Technology
+LRCX,Lam Research Corporation,Technology
+KLAC,KLA Corporation,Technology
+PANW,Palo Alto Networks Inc.,Technology
+SNPS,Synopsys Inc.,Technology
+CDNS,Cadence Design Systems Inc.,Technology
+ANET,Arista Networks Inc.,Technology
+CRWD,CrowdStrike Holdings Inc.,Technology
+MSI,Motorola Solutions Inc.,Technology
+ADSK,Autodesk Inc.,Technology
+ROP,Roper Technologies Inc.,Technology
+FTNT,Fortinet Inc.,Technology
+NXPI,NXP Semiconductors N.V.,Technology
+MCHP,Microchip Technology Incorporated,Technology
+MRVL,Marvell Technology Inc.,Technology
+WDAY,Workday Inc.,Technology
+TEAM,Atlassian Corporation,Technology
+DDOG,Datadog Inc.,Technology
+SNOW,Snowflake Inc.,Technology
+INTC,Intel Corporation,Technology
+HPQ,HP Inc.,Technology
+HPE,Hewlett Packard Enterprise,Technology
+DELL,Dell Technologies Inc.,Technology
+NTAP,NetApp Inc.,Technology
+STX,Seagate Technology Holdings,Technology
+WDC,Western Digital Corporation,Technology
+ON,ON Semiconductor Corporation,Technology
+TER,Teradyne Inc.,Technology
+SWKS,Skyworks Solutions Inc.,Technology
+QRVO,Qorvo Inc.,Technology
+ZS,Zscaler Inc.,Technology
+NET,Cloudflare Inc.,Technology
+MDB,MongoDB Inc.,Technology
+HUBS,HubSpot Inc.,Technology
+VEEV,Veeva Systems Inc.,Technology
+TYL,Tyler Technologies Inc.,Technology
+PTC,PTC Inc.,Technology
+ANSS,ANSYS Inc.,Technology
+GDDY,GoDaddy Inc.,Technology
+CTSH,Cognizant Technology Solutions,Technology
+GLW,Corning Incorporated,Technology
+KEYS,Keysight Technologies Inc.,Technology
+TDY,Teledyne Technologies Inc.,Technology
+GRMN,Garmin Ltd.,Technology
+ZBRA,Zebra Technologies Corporation,Technology
+TRMB,Trimble Inc.,Technology
+PSTG,Pure Storage Inc.,Technology
+DOCU,Docusign Inc.,Technology
+NTNX,Nutanix Inc.,Technology
+JNPR,Juniper Networks Inc.,Technology
+FSLR,First Solar Inc.,Technology
+ENPH,Enphase Energy Inc.,Technology
+NFLX,Netflix Inc.,Communication Services
+CMCSA,Comcast Corporation,Communication Services
+TMUS,T-Mobile US Inc.,Communication Services
+VZ,Verizon Communications Inc.,Communication Services
+T,AT&T Inc.,Communication Services
+DIS,The Walt Disney Company,Communication Services
+EA,Electronic Arts Inc.,Communication Services
+TTWO,Take-Two Interactive Software,Communication Services
+WBD,Warner Bros. Discovery Inc.,Communication Services
+SPOT,Spotify Technology S.A.,Communication Services
+PINS,Pinterest Inc.,Communication Services
+SNAP,Snap Inc.,Communication Services
+RBLX,Roblox Corporation,Communication Services
+MTCH,Match Group Inc.,Communication Services
+OMC,Omnicom Group Inc.,Communication Services
+LYV,Live Nation Entertainment Inc.,Communication Services

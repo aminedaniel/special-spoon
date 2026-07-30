@@ -1,0 +1,187 @@
+ticker,name,sector
+AAPL,Apple Inc.,Technology
+ACLS,Axcelis Technologies,Technology
+ACN,Accenture plc,Technology
+ADBE,Adobe Inc.,Technology
+ADI,Analog Devices Inc.,Technology
+ADSK,Autodesk Inc.,Technology
+AEIS,Advanced Energy Industries,Technology
+AKAM,Akamai Technologies,Technology
+ALAB,Astera Labs,Technology
+ALGM,Allegro MicroSystems,Technology
+ALRM,Alarm.com,Technology
+AMAT,Applied Materials Inc.,Technology
+AMBA,Ambarella,Technology
+AMD,Advanced Micro Devices Inc.,Technology
+AMPL,Amplitude,Technology
+ANET,Arista Networks Inc.,Technology
+ANSS,ANSYS Inc.,Technology
+APPN,Appian,Technology
+ASAN,Asana,Technology
+AVGO,Broadcom Inc.,Technology
+AVPT,AvePoint,Technology
+BAND,Bandwidth,Technology
+BB,BlackBerry,Technology
+BL,BlackLine,Technology
+BMBL,Bumble,Technology
+BOX,Box,Technology
+BRZE,Braze,Technology
+BSY,Bentley Systems,Technology
+CALX,Calix,Technology
+CAMT,Camtek,Technology
+CARG,CarGurus,Technology
+CDNS,Cadence Design Systems Inc.,Technology
+CFLT,Confluent,Technology
+CIEN,Ciena,Technology
+CMCSA,Comcast Corporation,Communication Services
+COHR,Coherent,Technology
+COHU,Cohu,Technology
+CRDO,Credo Technology,Technology
+CRM,Salesforce Inc.,Technology
+CRTO,Criteo,Technology
+CRUS,Cirrus Logic,Technology
+CRWD,CrowdStrike Holdings Inc.,Technology
+CSCO,Cisco Systems Inc.,Technology
+CTSH,Cognizant Technology Solutions,Technology
+CWAN,Clearwater Analytics,Technology
+CXM,Sprinklr,Technology
+CYBR,CyberArk Software,Technology
+DBX,Dropbox,Technology
+DDOG,Datadog Inc.,Technology
+DELL,Dell Technologies Inc.,Technology
+DGII,Digi International,Technology
+DIOD,Diodes,Technology
+DIS,The Walt Disney Company,Communication Services
+DOCN,DigitalOcean,Technology
+DOCU,Docusign Inc.,Technology
+DOMO,Domo,Technology
+DT,Dynatrace,Technology
+DV,DoubleVerify,Technology
+EA,Electronic Arts Inc.,Communication Services
+EGHT,8x8,Technology
+ENPH,Enphase Energy Inc.,Technology
+EPAM,EPAM Systems,Technology
+ESTC,Elastic,Technology
+EVCM,EverCommerce,Technology
+EXTR,Extreme Networks,Technology
+FFIV,F5,Technology
+FIVN,Five9,Technology
+FORM,FormFactor,Technology
+FROG,JFrog,Technology
+FSLR,First Solar Inc.,Technology
+FSLY,Fastly,Technology
+FTNT,Fortinet Inc.,Technology
+GDDY,GoDaddy Inc.,Technology
+GEN,Gen Digital,Technology
+GLW,Corning Incorporated,Technology
+GOOGL,Alphabet Inc.,Communication Services
+GRMN,Garmin Ltd.,Technology
+GTLB,GitLab,Technology
+HPE,Hewlett Packard Enterprise,Technology
+HPQ,HP Inc.,Technology
+HUBS,HubSpot Inc.,Technology
+IAS,Integral Ad Science,Technology
+IBM,International Business Machines,Technology
+ICHR,Ichor Holdings,Technology
+INTC,Intel Corporation,Technology
+INTU,Intuit Inc.,Technology
+IOT,Samsara,Technology
+JNPR,Juniper Networks Inc.,Technology
+KEYS,Keysight Technologies Inc.,Technology
+KLAC,KLA Corporation,Technology
+KLIC,Kulicke & Soffa,Technology
+LITE,Lumentum,Technology
+LRCX,Lam Research Corporation,Technology
+LSCC,Lattice Semiconductor,Technology
+LYV,Live Nation Entertainment Inc.,Communication Services
+MANH,Manhattan Associates,Technology
+MCHP,Microchip Technology Incorporated,Technology
+MDB,MongoDB Inc.,Technology
+META,Meta Platforms Inc.,Communication Services
+MGNI,Magnite,Technology
+MNDY,monday.com,Technology
+MRVL,Marvell Technology Inc.,Technology
+MSFT,Microsoft Corporation,Technology
+MSI,Motorola Solutions Inc.,Technology
+MTCH,Match Group Inc.,Communication Services
+MTSI,MACOM Technology,Technology
+MU,Micron Technology Inc.,Technology
+NET,Cloudflare Inc.,Technology
+NFLX,Netflix Inc.,Communication Services
+NOW,ServiceNow Inc.,Technology
+NTAP,NetApp Inc.,Technology
+NTNX,Nutanix Inc.,Technology
+NVDA,NVIDIA Corporation,Technology
+NVMI,Nova,Technology
+NVTS,Navitas Semiconductor,Technology
+NXPI,NXP Semiconductors N.V.,Technology
+OKTA,Okta,Technology
+OLO,Olo,Technology
+OMC,Omnicom Group Inc.,Communication Services
+ON,ON Semiconductor Corporation,Technology
+ONTO,Onto Innovation,Technology
+ORCL,Oracle Corporation,Technology
+PANW,Palo Alto Networks Inc.,Technology
+PATH,UiPath,Technology
+PCTY,Paylocity,Technology
+PD,PagerDuty,Technology
+PEGA,Pegasystems,Technology
+PI,Impinj,Technology
+PINS,Pinterest Inc.,Communication Services
+PLAB,Photronics,Technology
+POWI,Power Integrations,Technology
+PRGS,Progress Software,Technology
+PSTG,Pure Storage Inc.,Technology
+PTC,PTC Inc.,Technology
+PUBM,PubMatic,Technology
+QCOM,QUALCOMM Incorporated,Technology
+QLYS,Qualys,Technology
+QRVO,Qorvo Inc.,Technology
+RBLX,Roblox Corporation,Communication Services
+RMBS,Rambus,Technology
+RNG,RingCentral,Technology
+ROP,Roper Technologies Inc.,Technology
+RPD,Rapid7,Technology
+S,SentinelOne,Technology
+SEMR,Semrush,Technology
+SITM,SiTime,Technology
+SLAB,Silicon Labs,Technology
+SMTC,Semtech,Technology
+SNAP,Snap Inc.,Communication Services
+SNOW,Snowflake Inc.,Technology
+SNPS,Synopsys Inc.,Technology
+SPOT,Spotify Technology S.A.,Communication Services
+SPSC,SPS Commerce,Technology
+SPT,Sprout Social,Technology
+STX,Seagate Technology Holdings,Technology
+SWKS,Skyworks Solutions Inc.,Technology
+SYNA,Synaptics,Technology
+T,AT&T Inc.,Communication Services
+TDC,Teradata,Technology
+TDY,Teledyne Technologies Inc.,Technology
+TEAM,Atlassian Corporation,Technology
+TENB,Tenable,Technology
+TER,Teradyne Inc.,Technology
+TMUS,T-Mobile US Inc.,Communication Services
+TRMB,Trimble Inc.,Technology
+TTWO,Take-Two Interactive Software,Communication Services
+TWLO,Twilio,Technology
+TXN,Texas Instruments Incorporated,Technology
+TYL,Tyler Technologies Inc.,Technology
+U,Unity Software,Technology
+UCTT,Ultra Clean Holdings,Technology
+VECO,Veeco Instruments,Technology
+VEEV,Veeva Systems Inc.,Technology
+VIAV,Viavi Solutions,Technology
+VRNS,Varonis Systems,Technology
+VZ,Verizon Communications Inc.,Communication Services
+WBD,Warner Bros. Discovery Inc.,Communication Services
+WDAY,Workday Inc.,Technology
+WDC,Western Digital Corporation,Technology
+WIX,Wix.com,Technology
+WK,Workiva,Technology
+YELP,Yelp,Technology
+YEXT,Yext,Technology
+ZBRA,Zebra Technologies Corporation,Technology
+ZM,Zoom Communications,Technology
+ZS,Zscaler Inc.,Technology

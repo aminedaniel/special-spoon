@@ -45,6 +45,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Keep base weights fixed instead of walk-forward IC tilting",
     )
     parser.add_argument(
+        "--skip-edgar", action="store_true",
+        help="Score only the price/earnings signals (technical, stability, "
+             "earnings_drift). Drops EDGAR entirely, which is what makes a "
+             "wide-universe run take ~20 minutes instead of ~10 hours.",
+    )
+    parser.add_argument(
         "--max-form4", type=int, default=None,
         help="Form 4s fetched per ticker (default: scaled to the window). "
              "Too low and early rebalances see no insider activity at all.",
@@ -77,7 +83,12 @@ def main(argv: list[str] | None = None) -> int:
 
     client = None
     histories = {"form4": {t: None for t in universe}, "filings": {t: None for t in universe}, "text_cache": None}
-    if config.sec_edgar_user_agent:
+    if args.skip_edgar:
+        print(
+            "--skip-edgar: insider/events/filing-text not scored "
+            "(technical/stability/earnings-drift only)"
+        )
+    elif config.sec_edgar_user_agent:
         client = EdgarClient(config.sec_edgar_user_agent)
         edgar_since = args.start - timedelta(days=180)
         cap = args.max_form4 or form4_cap_for_window(edgar_since, args.end)
@@ -117,7 +128,14 @@ def main(argv: list[str] | None = None) -> int:
     # Stamp dates AND the parameters that change the result, so variant runs
     # over the same date range (different top-n or rebalance cadence) don't
     # clobber each other.
-    stem = f"backtest_{args.start}_{args.end}_top{args.top_n}_{args.step_weeks}w"
+    # Universe in the stem too: the size experiment runs the same dates and
+    # cadence over three different ticker lists.
+    uni = args.universe.stem.replace("universe", "").strip("_") or "smid"
+    suffix = "_priceonly" if args.skip_edgar else ""
+    stem = (
+        f"backtest_{uni}_{args.start}_{args.end}"
+        f"_top{args.top_n}_{args.step_weeks}w{suffix}"
+    )
     md_path = args.output_dir / f"{stem}.md"
     md_path.write_text(render_markdown(result, args.top_n, args.step_weeks))
     result.periods.to_csv(args.output_dir / f"{stem}_periods.csv", index=False)

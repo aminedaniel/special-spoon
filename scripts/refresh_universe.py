@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Rebuild config/universe.csv: small/mid-cap ($300M-$20B) US tech tickers.
+"""Rebuild a universe CSV of US tech tickers inside a market-cap band.
+
+Defaults to the small/mid band ($300M-$20B) that config/universe.csv uses;
+--min-cap/--max-cap rebuild any other band (e.g. a large-cap list for the
+size experiment in reports/backtests/).
 
 Run occasionally (quarterly is plenty) — the weekly pipeline reads the
 checked-in CSV and never depends on this script, so listing-source hiccups
@@ -29,8 +33,8 @@ log = logging.getLogger("refresh_universe")
 NASDAQ_LISTED = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 
-MIN_CAP = 300e6
-MAX_CAP = 20e9
+DEFAULT_MIN_CAP = 300e6
+DEFAULT_MAX_CAP = 20e9
 TECH_SECTORS = {"Technology", "Communication Services"}
 PAUSE_EVERY = 25
 PAUSE_SECS = 1.0
@@ -55,7 +59,12 @@ def fetch_symbols() -> list[str]:
     return sorted(set(symbols))
 
 
-def filter_tech_smid(symbols: list[str], limit: int | None) -> list[dict]:
+def filter_tech_band(
+    symbols: list[str],
+    limit: int | None,
+    min_cap: float = DEFAULT_MIN_CAP,
+    max_cap: float = DEFAULT_MAX_CAP,
+) -> list[dict]:
     """Keep symbols in the cap band + tech sectors, via yfinance lookups."""
     keep: list[dict] = []
     for i, sym in enumerate(symbols):
@@ -65,7 +74,7 @@ def filter_tech_smid(symbols: list[str], limit: int | None) -> list[dict]:
             continue
         cap = info.get("marketCap")
         sector = info.get("sector")
-        if cap and sector in TECH_SECTORS and MIN_CAP <= cap <= MAX_CAP:
+        if cap and sector in TECH_SECTORS and min_cap <= cap <= max_cap:
             keep.append({"ticker": sym, "name": info.get("shortName", ""), "sector": sector})
             log.info("kept %s (%s, $%.1fB)", sym, sector, cap / 1e9)
             if limit and len(keep) >= limit:
@@ -82,12 +91,14 @@ def main() -> int:
         "--limit", type=int, default=400,
         help="Stop after this many matches (keeps runtime bounded)",
     )
+    parser.add_argument("--min-cap", type=float, default=DEFAULT_MIN_CAP)
+    parser.add_argument("--max-cap", type=float, default=DEFAULT_MAX_CAP)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     symbols = fetch_symbols()
     log.info("%d listed symbols to screen", len(symbols))
-    rows = filter_tech_smid(symbols, args.limit)
+    rows = filter_tech_band(symbols, args.limit, args.min_cap, args.max_cap)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", newline="") as f:
