@@ -86,14 +86,17 @@ jobs:
           fi
           echo "Running: python run_backtest.py $ARGS"
           python run_backtest.py $ARGS -v
+      # Only this run's IC file. Catting every historical one buried a Python
+      # traceback under hundreds of lines of old CSV and made a failure
+      # impossible to read.
       - name: Show signal ICs in the run log
-        if: always()
+        if: success()
         run: |
-          for f in reports/backtests/*_ic.csv; do
-            [ -e "$f" ] || continue
-            echo "=== $f ==="
-            cat "$f"
-          done
+          newest=$(ls -t reports/backtests/*_ic.csv 2>/dev/null | head -1)
+          if [ -n "$newest" ]; then
+            echo "=== $newest ==="
+            cat "$newest"
+          fi
       - name: Commit results
         run: |
           git config user.name "github-actions[bot]"
