@@ -7,10 +7,10 @@ them by a weighted composite of:
 |---|---|---|
 | Earnings drift / PEAD (standardized earnings surprise) | 0.11 | Yahoo Finance earnings dates via `yfinance` |
 | Technicals (12-1 momentum, trend, breakout, volume) | 0.09 | Yahoo Finance via `yfinance` |
-| Fundamentals (growth, debt, ROE, margins) | 0.11 | Yahoo Finance via `yfinance` |
-| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.07 | Yahoo Finance statements via `yfinance` |
-| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | **0.18** | SEC EDGAR issuer submissions + Form 4 XML |
-| Stability (low beta vs QQQ + low idiosyncratic vol) | 0.02 | Yahoo Finance via `yfinance` |
+| Fundamentals (growth, debt, ROE, margins) | 0.12 | Yahoo Finance via `yfinance` |
+| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.08 | Yahoo Finance statements via `yfinance` |
+| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.13 | SEC EDGAR issuer submissions + Form 4 XML |
+| Stability (low beta vs QQQ + low idiosyncratic vol) | 0.05 | Yahoo Finance via `yfinance` |
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.08 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.06 | Yahoo Finance via `yfinance` |
@@ -23,22 +23,32 @@ Weights are *base* weights: once enough graded history accumulates, the scoreboa
 tilts them toward signals with demonstrated predictive power (see "Adaptive
 reweighting" below).
 
-Two of them are now set by **measurement rather than literature** — the 27-period
-walk-forward backtest (2024-07 → 2026-07) grades signals on non-overlapping forward
-returns, so its ICs are the statistically sound ones:
+No weight here is validated on this universe. A 53-period walk-forward backtest
+(2022-07 → 2026-07, non-overlapping forward returns) found **every backtestable
+signal statistically indistinguishable from zero**:
 
-| Signal | Measured IC | t | Verdict |
+| Signal | Measured IC | t | 95% CI |
 |---|---|---|---|
-| insider | **+0.068** | +1.96 | best in the set; weight raised 0.13 → 0.18 |
-| technical | +0.029 | +0.61 | weak, right sign; held at 0.09 |
-| earnings_drift | +0.001 | +0.03 | flat, but only ~20 names score per period; held |
-| events | −0.002 | −0.10 | flat — measured *before* the shelf/timing fixes |
-| stability | **−0.077** | −1.49 | **backwards in this regime**; cut 0.07 → 0.02 |
+| technical | +0.013 | +0.47 | [−0.042, +0.069] |
+| insider | +0.000 | +0.00 | [−0.039, +0.039] |
+| events | −0.004 | −0.25 | [−0.038, +0.029] |
+| earnings_drift | −0.006 | −0.34 | [−0.044, +0.031] |
+| stability | −0.022 | −0.64 | [−0.090, +0.046] |
 
-Stability was floored rather than removed: one momentum-led small-cap regime is not
-proof the low-risk anomaly is absent, and a zero weight can never earn its way back.
-The remaining seven signals cannot be backtested on free data (current-snapshot only),
-so their weights still rest on published evidence alone.
+An earlier 27-period run appeared to show insider at +0.068 (t=1.96). That was an
+artifact of a Form 4 fetch cap too small for the window — coverage varied with each
+issuer's filing frequency, which biased the cross-section — and it vanished once the
+cap was fixed. The episode is written up in `reports/backtests/COMPARISON.md`; the
+short version is **audit what the pipeline actually fetched before believing an IC**.
+
+Stability is the one signal with structure worth noting: IC **+0.029** in the
+2022–24 bear/recovery half and **−0.076** in the 2024–26 momentum half. Betting
+against beta pays in drawdowns and loses in momentum markets — the factor behaving
+as theory predicts, which is why it is held small rather than cut.
+
+Over the full four years the strategy returns +145.7% against QQQ's +148.5% with
+beta 1.15 — a slightly-levered index tracker, no alpha in either direction. Treat
+this as a research screen whose edge is unproven, not a validated strategy.
 
 The macro signal is deliberately **contextual, not weighted** — a market-wide value is
 identical for every ticker and cannot change relative rankings; it renders as a

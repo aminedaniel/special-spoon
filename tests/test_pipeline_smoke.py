@@ -16,13 +16,13 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.11,
+            "fundamentals": 0.12,
             "valuation": 0.06,
-            "profitability": 0.07,
+            "profitability": 0.08,
             "technical": 0.09,
             "earnings_drift": 0.11,
-            "stability": 0.02,
-            "insider": 0.18,
+            "stability": 0.05,
+            "insider": 0.13,
             "quality": 0.08,
             "short_interest": 0.07,
             "events": 0.08,

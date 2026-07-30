@@ -69,7 +69,12 @@ and filing-text into the comparison and make the IC column meaningful.
 
 ---
 
-# Five-signal run (2026-07-29) — the first real signal measurement
+# Five-signal run (2026-07-29, 2-year window) — SUPERSEDED, see below
+
+> **The insider result in this section is wrong.** It was produced with a Form 4
+> fetch cap of 80 filings/ticker, far too small for the window; the longer run
+> that follows shows the +0.068 disappears once coverage is fixed. The section is
+> kept unedited as the record of what was believed and why.
 
 Everything above measured **one signal**. The insider signal was silently
 returning $0 for every ticker in every one of those runs: `primaryDocument` for
@@ -130,3 +135,85 @@ comparisons discount is warranted — treat it as "promising and worth weight",
 not "established". Survivorship bias still inflates absolute returns. The seven
 signals that cannot be backtested on free data (fundamentals, valuation,
 quality, profitability, short interest, filing-text, trends) remain unmeasured.
+
+
+---
+
+# Four-year run (2026-07-29) — the correction
+
+53 non-overlapping periods, 2022-07-01 -> 2026-07-29, top 10, 4-week rebalances.
+Same code as the two-year run above except for one fix: the Form 4 cap now scales
+with the window (80 -> 635 filings/ticker).
+
+That fix changes the answer completely.
+
+## Per-signal IC — 53 periods
+
+| Signal | Mean IC | t | 95% CI | % positive |
+|---|---|---|---|---|
+| technical | +0.013 | +0.47 | [-0.042, +0.069] | 58% |
+| insider | +0.000 | +0.00 | [-0.039, +0.039] | 49% |
+| events | -0.004 | -0.25 | [-0.038, +0.029] | 53% |
+| earnings_drift | -0.006 | -0.34 | [-0.044, +0.031] | 42% |
+| stability | -0.022 | -0.64 | [-0.090, +0.046] | 49% |
+
+**Not one signal is distinguishable from zero.** Every confidence interval
+straddles it.
+
+## Why the insider result changed
+
+`fetch_form4_history` keeps the *newest* `max_filings` rows. With the cap at 80
+and a fetch window opening 2024-01, active filers (~70-110 Form 4s/year) had only
+their most recent ~9 months retained — so early rebalances saw no insider activity
+at all, and coverage varied **systematically with filing frequency**: infrequent
+filers got complete history, frequent filers got zeros. That is a biased
+cross-section, not random noise, and it manufactured a signal.
+
+Over the identical 2024-07 onward window:
+
+| Run | Form 4 cap | Insider IC |
+|---|---|---|
+| 2-year | 80 | **+0.068** |
+| 4-year, same window | 635 | **+0.009** |
+
+Same dates, same scoring code, different data coverage.
+
+## The one finding that survives
+
+Stability splits by regime exactly as the low-risk anomaly predicts:
+
+| Window | Stability IC |
+|---|---|
+| 2022-07 -> 2024-06 (bear + recovery) | **+0.029** |
+| 2024-07 -> 2026-07 (momentum-led) | **-0.076** |
+
+Betting against beta pays in drawdowns and loses in momentum markets. That is the
+factor behaving normally, not a broken signal — so cutting it to 0.02 on the
+momentum half alone was over-reading a single regime.
+
+## Portfolio level
+
+| | 2-year (27p) | 4-year (53p) |
+|---|---|---|
+| Cumulative | +38.9% (QQQ +43.0%) | +145.7% (QQQ +148.5%) |
+| Beta vs QQQ | 1.32 | 1.15 |
+| CAPM alpha (annualized) | -4.3% | -1.9% |
+| t(alpha) | -0.33 | -0.23 |
+
+Over four years the strategy is a slightly-levered index tracker: it roughly
+matches QQQ, with no alpha in either direction.
+
+## What this means for the weights
+
+Nothing in `config/weights.yaml` is validated on this universe. The weights rest
+on published evidence and judgement, which is the honest basis available — but
+they should not be described as measured. Two lessons worth keeping:
+
+1. **A weight change needs the data pipeline audited first.** Both false signals
+   found today (insider looking dead, then insider looking strong) were data-
+   coverage artifacts, not scoring bugs. Check what was actually fetched before
+   believing an IC.
+2. **53 periods of nothing is itself informative.** It says any real edge here is
+   small enough to need far more data — or a different kind of signal than
+   free-tier sources provide. It does not say the screen is worthless; it says
+   the screen has not been shown to beat holding QQQ.
