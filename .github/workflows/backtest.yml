@@ -7,6 +7,18 @@ name: Backtest
 on:
   workflow_dispatch:
     inputs:
+      universe:
+        description: "Universe CSV to score"
+        type: choice
+        options:
+          - config/universe.csv
+          - config/universe_largecap.csv
+          - config/universe_merged.csv
+        default: config/universe.csv
+      skip_edgar:
+        description: "Price/earnings signals only — no EDGAR (minutes instead of hours; required for wide universes)"
+        type: boolean
+        default: false
       start:
         description: "Start date (YYYY-MM-DD)"
         type: string
@@ -56,6 +68,7 @@ jobs:
             echo "::warning::SEC_EDGAR_USER_AGENT is not set — insider, events, and filing-text signals will be skipped. The backtest will measure the technical signal only."
           fi
           ARGS="--start ${{ inputs.start }}"
+          ARGS="$ARGS --universe ${{ inputs.universe }}"
           ARGS="$ARGS --step-weeks ${{ inputs.step_weeks }}"
           ARGS="$ARGS --top-n ${{ inputs.top_n }}"
           ARGS="$ARGS --output-dir reports/backtests"
@@ -67,6 +80,9 @@ jobs:
           fi
           if [ "${{ inputs.no_adaptive }}" = "true" ]; then
             ARGS="$ARGS --no-adaptive"
+          fi
+          if [ "${{ inputs.skip_edgar }}" = "true" ]; then
+            ARGS="$ARGS --skip-edgar"
           fi
           echo "Running: python run_backtest.py $ARGS"
           python run_backtest.py $ARGS -v
@@ -83,5 +99,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/backtests/
-          git diff --cached --quiet || git commit -m "Backtest ${{ inputs.start }} (step ${{ inputs.step_weeks }}w, top ${{ inputs.top_n }})"
+          git diff --cached --quiet || git commit -m "Backtest ${{ inputs.universe }} ${{ inputs.start }} (step ${{ inputs.step_weeks }}w, top ${{ inputs.top_n }})"
+          git pull --rebase origin main || true
           git push

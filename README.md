@@ -187,9 +187,38 @@ cap sized for one year would leave every early rebalance of a multi-year run wit
 in-window insider activity — a constant column that looks like a working signal and
 measures nothing. Small/mid-cap tech issuers file roughly 70–110 Form 4s a year.
 
-Also runnable from the Actions tab (**Backtest** → Run workflow) with start/end,
-step-weeks, top-n, and filing-text as inputs; results are committed to
-`reports/backtests/`. Set the `SEC_EDGAR_USER_AGENT` secret first — without it the
+Also runnable from the Actions tab (**Backtest** → Run workflow) with universe,
+start/end, step-weeks, top-n, filing-text, and `skip_edgar` as inputs; results are
+committed to `reports/backtests/`, stamped with the universe so variants don't
+clobber each other.
+
+`--skip-edgar` scores only the signals that need no SEC calls (technical, stability,
+earnings-drift). EDGAR is the entire runtime cost — roughly 1.6 min/ticker over a
+four-year window — so a 186-name universe takes ~20 minutes with the flag and would
+take **10+ hours** without it, past both this workflow's timeout and GitHub's job cap.
+
+### Universe size experiment
+
+Three checked-in, mutually disjoint universes let the screen be tested across the
+size spectrum:
+
+| File | Names | Band |
+|---|---|---|
+| `config/universe.csv` | 99 | $300M–$20B (the live screen) |
+| `config/universe_largecap.csv` | 87 | >$20B US tech / comm services |
+| `config/universe_merged.csv` | 186 | the union |
+
+Run separately rather than blended by design. Most of these anomalies are documented
+to concentrate in small caps (limits to arbitrage: PEAD is strongest in thinly
+covered names, insider buying in small firms, short interest where borrow is
+constrained), so the expectation is that they *weaken* with size.
+
+More importantly, ranking across a merged universe makes **size itself the dominant
+hidden factor** — beta, volatility, multiples and momentum all correlate with market
+cap, so a blended composite becomes a size bet wearing twelve signals as a costume.
+Over 2022–2026 mega-cap tech massively outperformed small-cap tech, so a merged run
+would likely look *better* while measuring nothing new. Comparing the merged result
+against the two separate runs is what isolates that confound. Set the `SEC_EDGAR_USER_AGENT` secret first — without it the
 run measures the technical signal only.
 
 ### How much data before re-weighting?

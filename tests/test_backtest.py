@@ -165,3 +165,23 @@ def test_form4_cap_scales_with_window():
     assert four_yr >= 4 * 110
     # Never drops below the single-window default, even for a tiny range.
     assert form4_cap_for_window(date(2026, 7, 1), end) >= MAX_HISTORY_FILINGS
+
+
+def test_universe_files_are_disjoint_and_merged_is_their_union():
+    """The size experiment only means anything if small/mid and large-cap
+    don't overlap — otherwise 'large caps' silently includes small caps."""
+    import csv
+    from pathlib import Path
+
+    root = Path(__file__).parent.parent / "config"
+    def tickers(name):
+        with open(root / name) as f:
+            return {r["ticker"] for r in csv.DictReader(f)}
+
+    smid = tickers("universe.csv")
+    large = tickers("universe_largecap.csv")
+    merged = tickers("universe_merged.csv")
+
+    assert not (smid & large), f"universes overlap: {smid & large}"
+    assert merged == smid | large
+    assert len(merged) == len(smid) + len(large)
