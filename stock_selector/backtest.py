@@ -164,6 +164,18 @@ def collect_earnings_histories(tickers: list[str]) -> dict:
     return earnings.fetch_earnings_history(tickers)
 
 
+def _surprise_or_none(frame, ticker: str, as_of: date) -> dict | None:
+    """Per-ticker earnings parse, isolated. One malformed frame must not kill
+    a multi-hour walk-forward run, and the log has to name the ticker."""
+    if frame is None:
+        return None
+    try:
+        return earnings.surprise_asof(frame, as_of)
+    except Exception as exc:  # noqa: BLE001 — per-ticker failures are non-fatal
+        log.warning("earnings parse failed for %s at %s: %s", ticker, as_of, exc)
+        return None
+
+
 def scores_asof(
     as_of: date,
     prices: pd.DataFrame,
@@ -197,14 +209,7 @@ def scores_asof(
     }
     if histories.get("earnings") is not None:
         out["earnings_drift"] = earnings_drift_signal.score(
-            {
-                t: (
-                    earnings.surprise_asof(f, as_of)
-                    if (f := histories["earnings"].get(t)) is not None
-                    else None
-                )
-                for t in tickers
-            }
+            {t: _surprise_or_none(histories["earnings"].get(t), t, as_of) for t in tickers}
         )
     if include_filing_text and client is not None:
         out["filing_text"] = filing_text_signal.score(

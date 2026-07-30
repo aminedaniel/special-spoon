@@ -67,3 +67,32 @@ def test_signal_ranks_beats_above_misses_with_nan_for_no_info():
     })
     assert scores["BEAT"] > scores["MISS"]
     assert np.isnan(scores["NONE"])
+
+
+def test_duplicate_announcement_timestamps_collapse():
+    """Some issuers return duplicate rows for one announcement (restatements,
+    dual listings). Without collapsing, .loc[ts] yields a Series and the
+    arithmetic raises — which would abort a whole run on one bad ticker."""
+    f = pd.DataFrame(
+        {"EPS Estimate": [0.60, 0.60], "Reported EPS": [0.70, 0.72]},
+        index=pd.DatetimeIndex(["2026-07-15", "2026-07-15"]),
+    )
+    out = surprise_asof(f, AS_OF)
+    assert out is not None
+    # keep="last" wins
+    assert out["surprise_pct"] == (0.72 - 0.60) / 0.60 * 100.0
+
+
+def test_tz_aware_index_is_accepted():
+    f = pd.DataFrame(
+        {"EPS Estimate": [0.60], "Reported EPS": [0.72]},
+        index=pd.DatetimeIndex(["2026-07-15"], tz="America/New_York"),
+    )
+    assert surprise_asof(f, AS_OF) is not None
+
+
+def test_unparseable_index_returns_none_not_raises():
+    f = pd.DataFrame(
+        {"EPS Estimate": [0.60], "Reported EPS": [0.72]}, index=["not-a-date"]
+    )
+    assert surprise_asof(f, AS_OF) is None

@@ -71,12 +71,12 @@ def fetch_earnings_surprise(
         out[ticker] = None
         try:
             frame = yf.Ticker(ticker).get_earnings_dates(limit=MAX_QUARTERS)
+            if frame is None or frame.empty:
+                continue
+            parsed = surprise_asof(frame, as_of)
         except Exception as exc:  # noqa: BLE001 — per-ticker failures are non-fatal
-            log.debug("earnings dates failed for %s: %s", ticker, exc)
+            log.warning("earnings surprise failed for %s: %s", ticker, exc)
             continue
-        if frame is None or frame.empty:
-            continue
-        parsed = surprise_asof(frame, as_of)
         if parsed is not None:
             out[ticker] = parsed
         if (i + 1) % BATCH_PAUSE_EVERY == 0:
@@ -110,10 +110,21 @@ def fetch_earnings_history(
 
 
 def surprise_asof(frame: pd.DataFrame, as_of: date) -> dict | None:
-    """Extract the newest reported announcement within the drift window."""
+    """Extract the newest reported announcement within the drift window.
+
+    Defensive about what yfinance actually returns per ticker: the index may
+    be tz-aware or tz-naive, and some issuers come back with duplicate
+    announcement timestamps (restatements, dual rows). A duplicate makes
+    `.loc[ts]` return a Series instead of a scalar, which would blow up the
+    arithmetic below — so duplicates are collapsed to the last row first.
+    """
     f = frame.copy()
-    f.index = pd.to_datetime(f.index).tz_localize(None)
-    f = f.sort_index()
+    idx = pd.to_datetime(f.index, errors="coerce", utc=True)
+    f.index = idx.tz_localize(None) if idx.tz is not None else idx
+    f = f[f.index.notna()]
+    if f.empty:
+        return None
+    f = f[~f.index.duplicated(keep="last")].sort_index()
 
     reported = pd.to_numeric(f.get("Reported EPS"), errors="coerce")
     estimate = pd.to_numeric(f.get("EPS Estimate"), errors="coerce")
@@ -133,6 +144,7 @@ def surprise_asof(frame: pd.DataFrame, as_of: date) -> dict | None:
 
     est = float(estimate.loc[latest_ts])
     act = float(reported.loc[latest_ts])
+
     # Surprise relative to |estimate|; a near-zero estimate would explode the
     # ratio, so floor the denominator (interpretation: cents of beat).
     denom = max(abs(est), 0.01)
