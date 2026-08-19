@@ -1,0 +1,39 @@
+name,description,category,unit,price
+Demolition — kitchen,"Cabinets, counters, flooring; haul-off included",Demolition,ea,1800.00
+Demolition — bathroom,,Demolition,ea,1200.00
+Demolition — general,,Demolition,hr,85.00
+Dumpster / debris disposal,,Demolition,ea,620.00
+Framing — labor,,Framing & structure,hr,95.00
+Header / load-bearing wall opening,,Framing & structure,ea,2850.00
+"Drywall — hang, tape, finish",,Drywall & paint,sf,3.75
+Interior paint — walls & ceiling,,Drywall & paint,sf,2.50
+Trim & baseboard install,,Drywall & paint,lf,12.00
+Electrical — rough-in per opening,,Electrical,ea,220.00
+Recessed light — supply & install,,Electrical,ea,280.00
+Panel / circuit upgrade,,Electrical,ea,1850.00
+Plumbing — fixture rough-in & set,,Plumbing,ea,950.00
+Relocate drain / supply line,,Plumbing,ea,1450.00
+HVAC — register / duct modification,,HVAC,ea,680.00
+Stock cabinetry — supply & install,,Cabinetry,lf,320.00
+Semi-custom cabinetry — supply & install,,Cabinetry,lf,580.00
+Custom cabinetry — supply & install,,Cabinetry,lf,950.00
+Cabinet hardware,,Cabinetry,ea,22.00
+Quartz countertop — fabricate & install,,Countertops,sf,85.00
+Granite countertop — fabricate & install,,Countertops,sf,75.00
+Laminate countertop,,Countertops,sf,32.00
+Undermount sink cutout,,Countertops,ea,250.00
+Tile backsplash,,Tile & flooring,sf,28.00
+Tile floor — supply & install,,Tile & flooring,sf,32.00
+Shower tile surround,,Tile & flooring,sf,42.00
+LVP flooring — supply & install,,Tile & flooring,sf,11.00
+Hardwood flooring — supply & install,,Tile & flooring,sf,14.50
+Shower pan / waterproofing,,Tile & flooring,ea,1450.00
+Appliance install,,Fixtures & appliances,ea,180.00
+Vanity — supply & install,,Fixtures & appliances,ea,1250.00
+Toilet — supply & install,,Fixtures & appliances,ea,620.00
+Faucet / fixture set,,Fixtures & appliances,ea,420.00
+Interior door — supply & install,,Doors & windows,ea,550.00
+Window — supply & install,,Doors & windows,ea,1180.00
+Permit & inspection,,Project costs,ea,850.00
+Project management / supervision,,Project costs,day,550.00
+Final clean,,Project costs,ea,450.00
