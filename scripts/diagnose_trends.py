@@ -53,8 +53,26 @@ def main() -> int:
     print(f"pytrends version: {_version()}")
     print(f"python: {sys.version.split()[0]}\n")
 
+    # 0. The EXACT constructor the live signal uses. Steps [1]-[3] all pass
+    #    without retries/backoff_factor, so if this is the only thing that
+    #    differs and it raises, that is the whole bug: fetch_interest_momentum
+    #    catches it, logs "pytrends init failed" and returns all-None, which
+    #    the pipeline reports as "no data returned".
+    print("[0] TrendReq(..., retries=2, backoff_factor=1.0) — the signal's own call")
+    try:
+        from pytrends.request import TrendReq as _TR
+        _client = _TR(hl="en-US", tz=0, timeout=(10, 30), retries=2, backoff_factor=1.0)
+        _client.build_payload(["AAPL stock"], timeframe="today 3-m")
+        _df = _client.interest_over_time()
+        print(f"   OK — constructed AND fetched {0 if _df is None else len(_df)} rows")
+        print("   -> the constructor is NOT the bug; look elsewhere\n")
+    except Exception as exc:  # noqa: BLE001
+        print("   FAILED — this is what the weekly run hits every single week")
+        _describe(exc)
+        print()
+
     # 1. Does the client even construct? (No network on older versions.)
-    print("[1] TrendReq(...) construction")
+    print("[1] TrendReq(...) construction — without retries/backoff")
     try:
         from pytrends.request import TrendReq
         pytrends = TrendReq(hl="en-US", tz=0, timeout=(10, 30))
