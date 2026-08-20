@@ -1,7 +1,10 @@
-# SnapBid — Phase 0 + Phase 1
+# SnapBid
 
-An estimate-to-close engine for specialty trade contractors. This app covers the
-first two phases of the build blueprint:
+An estimate-to-close engine for specialty trade contractors: a job-site visit
+becomes a priced, branded proposal in minutes, and the proposal collects a
+signature and a deposit on its own.
+
+This repository covers the first two phases of the build blueprint:
 
 - **Phase 0 — scaffold.** Next.js (App Router) + Tailwind + Supabase auth, org/user
   model, logged-in dashboard shell.
@@ -61,6 +64,7 @@ Optional:
 ## 4. Run it
 
 ```bash
+git clone https://github.com/<owner>/snapbid.git
 cd snapbid
 cp .env.example .env.local     # then fill in the values
 npm install
@@ -140,7 +144,8 @@ Guarantee states:
 
 Vercel + Supabase, no other infrastructure:
 
-1. Point a Vercel project at this directory (set **Root Directory** to `snapbid`).
+1. Import this repository into Vercel. The app is at the repository root, so
+   leave **Root Directory** alone.
 2. Add every variable from `.env.example` in **Settings → Environment Variables**,
    with `NEXT_PUBLIC_APP_URL` set to the real domain (proposal links are built from it).
 3. Deploy. `vercel.json` registers the daily guarantee cron.
