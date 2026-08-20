@@ -86,12 +86,41 @@ def main() -> int:
             _describe(exc)
             print()
 
+    # 3. The probes above prove Google answers. So run the signal's OWN
+    #    reducer over the returned frame and show where it bails.
+    print("[3] interest_momentum() over the batch Google just returned")
+    try:
+        from stock_selector.data_sources.google_trends import interest_momentum
+        pytrends.build_payload(
+            ["RNG stock", "CARG stock", "DBX stock", "YELP stock", "TENB stock"],
+            timeframe="today 3-m",
+        )
+        df = pytrends.interest_over_time()
+        if "isPartial" in df.columns:
+            df = df[~df["isPartial"].astype(bool)]
+        for kw in [c for c in df.columns if c != "isPartial"]:
+            s_ = df[kw].dropna()
+            baseline = s_.iloc[:-14]
+            print(
+                f"   {kw:12s} n={len(s_):3d} "
+                f"baseline_mean={float(baseline.mean()):6.2f} "
+                f"recent_mean={float(s_.iloc[-14:].mean()):6.2f} "
+                f"nonzero_days={int((s_ > 0).sum()):3d} "
+                f"-> momentum={interest_momentum(df[kw])}"
+            )
+        print()
+    except Exception as exc:  # noqa: BLE001
+        print("   FAILED")
+        _describe(exc)
+        print()
+
     print("=== VERDICT ===")
     print("429 / TooManyRequests  -> Google is blocking this runner. Datacenter")
     print("                          IPs are blocked categorically; backoff cannot")
     print("                          fix it. Drop the signal or move it off CI.")
     print("empty frame, HTTP 200  -> not blocked; the signal's parsing is at fault.")
-    print("success                -> the failure is intermittent after all.")
+    print("success                -> not blocked at all; read [3] for where the")
+    print("                          signal actually discards the data.")
     return 0
 
 
