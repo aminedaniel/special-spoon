@@ -19,6 +19,11 @@ from __future__ import annotations
 
 import sys
 import traceback
+from pathlib import Path
+
+# Same as scripts/diagnose_edgar.py: the script runs from the repo root but
+# stock_selector is not installed, so put the repo on the path for step [3].
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def _version() -> str:
