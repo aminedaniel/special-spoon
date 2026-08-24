@@ -13,7 +13,6 @@ from .config import Config
 from .data_sources import (
     earnings,
     edgar_filings,
-    google_trends,
     macro_fred,
     market_data,
     sec_insider,
@@ -30,7 +29,6 @@ from .signals import quality as quality_signal
 from .signals import short_interest as short_interest_signal
 from .signals import stability as stability_signal
 from .signals import technical as technical_signal
-from .signals import trends as trends_signal
 from .signals import valuation as valuation_signal
 
 log = logging.getLogger(__name__)
@@ -124,14 +122,6 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
                 "announcement in the drift window; its weight was redistributed"
             )
 
-        trends_momentum = google_trends.fetch_interest_momentum(shortlist)
-        if any(v is not None for v in trends_momentum.values()):
-            category_scores["trends"] = trends_signal.score(trends_momentum)
-        else:
-            notes.append(
-                "Google Trends signal unavailable: no data returned (likely rate-limited); "
-                "its weight was redistributed"
-            )
 
     # ---- Composite over the shortlist --------------------------------------
     shortlist_scores = {

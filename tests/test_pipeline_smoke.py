@@ -16,18 +16,17 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 def _config() -> Config:
     return Config(
         weights={
-            "fundamentals": 0.12,
-            "valuation": 0.06,
-            "profitability": 0.08,
+            "fundamentals": 0.13,
+            "valuation": 0.07,
+            "profitability": 0.09,
             "technical": 0.09,
             "earnings_drift": 0.11,
             "stability": 0.05,
-            "insider": 0.13,
-            "quality": 0.08,
+            "insider": 0.14,
+            "quality": 0.09,
             "short_interest": 0.07,
             "events": 0.08,
             "filing_text": 0.08,
-            "trends": 0.05,
         },
         thresholds={"min_market_cap": 1e8, "max_market_cap": 20e9, "max_pe": 60},
         top_n=3,
@@ -61,7 +60,6 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 
 @patch("stock_selector.pipeline.market_data.fetch_profitability_metrics")
 @patch("stock_selector.pipeline.earnings.fetch_earnings_surprise")
-@patch("stock_selector.pipeline.google_trends.fetch_interest_momentum")
 @patch("stock_selector.pipeline.market_data.fetch_share_change")
 @patch("stock_selector.pipeline.edgar_filings.fetch_filing_similarity")
 @patch("stock_selector.pipeline.edgar_filings.fetch_event_points")
@@ -71,7 +69,7 @@ def test_dry_run_produces_report(mock_fund, mock_prices, tmp_path):
 @patch("stock_selector.pipeline.market_data.fetch_fundamentals")
 def test_full_run_includes_stage_b(
     mock_fund, mock_prices, mock_form4, mock_regime,
-    mock_events, mock_sim, mock_shares, mock_trends, mock_surprise,
+    mock_events, mock_sim, mock_shares, mock_surprise,
     mock_prof, tmp_path
 ):
     import pandas as pd
@@ -92,7 +90,6 @@ def test_full_run_includes_stage_b(
     mock_shares.return_value = pd.Series(
         {t: 0.02 * (i + 1) for i, t in enumerate(TICKERS[:4])}
     )
-    mock_trends.return_value = {t: (1.2 if t == "CCCC" else 0.0) for t in TICKERS[:4]}
     mock_surprise.return_value = {
         t: (
             {"sue": 2.5, "surprise_pct": 9.0, "days_since": 12}
@@ -119,13 +116,10 @@ def test_full_run_includes_stage_b(
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
     assert "score_quality" in result.rankings.columns
-    assert "score_trends" in result.rankings.columns
     events = result.rankings["score_events"]
     assert events["BBBB"] == events.max()  # the 13D holder ranks top on events
     drift = result.rankings["score_earnings_drift"]
     assert drift["AAAA"] == drift.max()  # the big beat ranks top on drift
-    trends = result.rankings["score_trends"]
-    assert trends["CCCC"] == trends.max()  # the search-spike name ranks top on trends
     assert result.regime["label"] == "neutral"
 
     md_path, _ = write_report(result, top_n=3, output_dir=tmp_path)

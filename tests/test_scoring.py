@@ -88,7 +88,7 @@ def test_degenerate_categories_flags_constant_only():
         "technical": pd.Series({"a": 10.0, "b": 90.0, "c": 50.0}),
         "insider": pd.Series({"a": 50.8, "b": 50.8, "c": 50.8}),  # no activity
         "events": pd.Series({"a": np.nan, "b": 50.8, "c": 50.8}),  # constant where present
-        "trends": pd.Series({"a": np.nan, "b": np.nan, "c": 40.0}),  # single obs, not degenerate
+        "short_interest": pd.Series({"a": np.nan, "b": np.nan, "c": 40.0}),  # single obs, not degenerate
     }
     assert degenerate_categories(cats) == ["insider", "events"]
 

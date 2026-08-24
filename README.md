@@ -7,16 +7,15 @@ them by a weighted composite of:
 |---|---|---|
 | Earnings drift / PEAD (standardized earnings surprise) | 0.11 | Yahoo Finance earnings dates via `yfinance` |
 | Technicals (12-1 momentum, trend, breakout, volume) | 0.09 | Yahoo Finance via `yfinance` |
-| Fundamentals (growth, debt, ROE, margins) | 0.12 | Yahoo Finance via `yfinance` |
-| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.08 | Yahoo Finance statements via `yfinance` |
-| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.13 | SEC EDGAR issuer submissions + Form 4 XML |
+| Fundamentals (growth, debt, ROE, margins) | 0.13 | Yahoo Finance via `yfinance` |
+| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.09 | Yahoo Finance statements via `yfinance` |
+| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
 | Stability (low beta vs QQQ + low idiosyncratic vol) | 0.05 | Yahoo Finance via `yfinance` |
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
-| Quality (accrual gap, share dilution) | 0.08 | Yahoo Finance financial fields + share history |
-| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.06 | Yahoo Finance via `yfinance` |
+| Quality (accrual gap, share dilution) | 0.09 | Yahoo Finance financial fields + share history |
+| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.07 | Yahoo Finance via `yfinance` |
 | Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
-| Search-interest momentum (retail attention) | 0.05 | Google Trends via `pytrends` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
 Weights are *base* weights: once enough graded history accumulates, the scoreboard
@@ -68,7 +67,7 @@ Two-stage funnel to stay inside free-API rate limits:
 1. **Stage A** — batched fundamentals + 1y price history for the whole universe,
    quality gate (cap band, extreme P/E), rank on fundamentals + technicals.
 2. **Stage B** — only the top `stage_a_shortlist_size` names get the expensive
-   per-ticker calls (SEC EDGAR, Google Trends). Missing data never zeroes a
+   per-ticker calls (SEC EDGAR, earnings dates, statements). Missing data never zeroes a
    score: weights renormalize over the categories actually present.
 
 A signal that comes back **identical for every ticker** is dropped and its weight
@@ -94,7 +93,7 @@ cp .env.example .env      # then fill in:
 
 ```bash
 python run_weekly_report.py                       # full weekly run
-python run_weekly_report.py --dry-run             # Stage A only, no EDGAR/Trends/FRED
+python run_weekly_report.py --dry-run             # Stage A only, no EDGAR/FRED
 python run_weekly_report.py --universe my.csv     # custom watchlist (needs 'ticker' column)
 python run_weekly_report.py --top-n 10 -v
 ```
@@ -175,7 +174,7 @@ Only truly point-in-time signals participate: technical, stability (trailing-yea
 beta/idio-vol from the same sliced prices), earnings-drift (dated announcements via
 the same `surprise_asof` the weekly run uses for "today"), insider, events, and
 (with `--include-filing-text`, document-heavy) filing language. Fundamentals,
-valuation, quality, short interest, and trends are excluded — free sources only
+valuation, quality, and short interest are excluded — free sources only
 serve *current* snapshots for those, and backtesting them with today's data would
 be lookahead bias. Results also carry survivorship bias: today's universe omits
 delisted names, so absolute returns flatter; treat relative signal comparisons
@@ -299,18 +298,33 @@ Reddit sentiment (OAuth app + VADER/ticker-disambiguation),
 BLS/FRED hiring & supply-cost overlays, supply-chain links from 10-K customer
 disclosures (Cohen-Frazzini), HTML report, LLM-written per-pick narratives,
 response caching. Per-ticker options flow is excluded — no viable free source.
-Google Trends search-interest momentum is now **implemented** as a scored signal.
 
-### Search-interest momentum (Google Trends)
+### Removed: search-interest momentum (Google Trends)
 
-Free, no auth. For each shortlisted ticker it pulls Google Trends interest for
-`"<ticker> stock"` and scores **recent-vs-baseline momentum** (last ~14 days vs the
-trailing ~90). Momentum, not raw interest, is used deliberately: Trends normalizes
-every request to its own peak, so raw 0-100 values aren't comparable across tickers —
-a recent/baseline *ratio* is self-normalizing and comparable after ranking. It
-measures retail *attention*, whose predictive sign is unproven, so it carries a small
-base weight (0.07) and the adaptive-reweighting IC tracking decides its real value.
-Google Trends is heavily rate-limited; requests batch 5 tickers at a time and the
-signal fails soft (weight redistributes) if throttled. Because Trends data is
-historical, this signal is backtest-ready — wiring it into the walk-forward loop is
-a follow-up.
+Removed after eight weeks in which it produced **zero** data points: no
+`score_trends` column was ever written to a rankings CSV, and `trends` never
+appeared in `reports/signal_ic.csv`. The report's "likely rate-limited" note was
+guess text, never a diagnosis — so it was measured before being cut.
+
+The diagnostic (run four times from CI) found the behaviour is **non-deterministic
+rate limiting**, not a categorical block and not a code bug:
+
+| Run | Outcome |
+|---|---|
+| 3 probes | all succeeded — full frames, real momentum values for every ticker |
+| 5+ probes, minutes later | `TooManyRequestsError`, HTTP 429, `Error 429 (Bad Request)` |
+
+Google enforces a small per-IP quota, and GitHub runner IPs are shared and
+recycled, so whether a request succeeds depends on what other people's workflows
+have already spent. The weekly run needs **20 sequential batch requests**
+(99 tickers / 5), which exceeds that quota comfortably — and on an already-spent
+IP even the first batch fails, so every ticker returns None.
+
+No batching or backoff scheme fits 20 requests into a quota of a few, so this is
+not engineerable around on shared CI. It was also the weakest-evidence signal in
+the set — search attention predicts *volatility*, not direction — and its 0.05
+redistributed cleanly, so removal costs nothing measurable.
+
+Reinstating it would need a non-datacenter egress path (a self-hosted runner or a
+proxy) and would still be worth only a small weight until its IC could be measured.
+

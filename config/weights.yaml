@@ -10,17 +10,16 @@
 # So these rest on published evidence and judgement, which is the honest
 # basis available. Do not treat any of them as validated on this universe.
 weights:
-  insider: 0.13          # insider buying: strong literature, unvalidated here (measured +0.000 over 53 periods)
-  fundamentals: 0.12     # growth + balance-sheet quality (valuation moved out)
+  insider: 0.14          # insider buying: strong literature, unvalidated here (measured +0.000 over 53 periods)
+  fundamentals: 0.13     # growth + balance-sheet quality (valuation moved out)
   earnings_drift: 0.11   # PEAD/SUE; measured flat, but on only ~20 scored names/period
   technical: 0.09        # 12-1 momentum; best of a weak field (+0.013, t=0.47) but not significant
-  quality: 0.08          # accruals gap + share-count dilution
+  quality: 0.09          # accruals gap + share-count dilution
   events: 0.08           # 13D stakes, shelves, 8-K red flags; measured ~0.000 over 53 periods
   filing_text: 0.08      # 10-Q/10-K language stability ("lazy prices")
-  profitability: 0.08    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors
+  profitability: 0.09    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors
   short_interest: 0.07   # high/rising short interest predicts negative returns
-  valuation: 0.06        # cheapness predicts poorly in tech
-  trends: 0.05           # Google Trends search-interest momentum (unproven; small)
+  valuation: 0.07        # cheapness predicts poorly in tech
   stability: 0.05        # low beta/idio-vol. Regime-dependent exactly as theory predicts:
                          # IC +0.029 in the 2022-24 bear/recovery half, -0.076 in the
                          # 2024-26 momentum half, ~-0.022 over the full 53 periods. Held
