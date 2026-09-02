@@ -11,7 +11,7 @@ from .pipeline import PipelineResult
 
 DISCLAIMER = (
     "*This is an automated screen for research purposes, not investment advice. "
-    "Data comes from free sources (Yahoo Finance, SEC EDGAR, Google Trends, FRED) "
+    "Data comes from free sources (Yahoo Finance, SEC EDGAR, FRED) "
     "with no accuracy guarantee. Insider and corporate-event signals reflect SEC "
     "filings, which are themselves lagged by each form's disclosure deadline.*"
 )
