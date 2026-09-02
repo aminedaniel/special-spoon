@@ -1,0 +1,39 @@
+name: Diagnose Congress Coverage
+
+# Manual only. Answers one question with data: how many of this universe's
+# small/mid-cap names ever appear in congressional trading disclosures? The
+# congress signal was dropped in #12 partly on a lag argument that does not
+# hold up (the insider signal uses a 90-day window at the largest weight), so
+# coverage is the thing worth measuring. Writes nothing to the repo.
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "Trailing window in days"
+        type: string
+        default: "365"
+      universe:
+        description: "Universe CSV to check coverage against"
+        type: choice
+        default: "config/universe.csv"
+        options:
+          - config/universe.csv
+          - config/universe_largecap.csv
+          - config/universe_merged.csv
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Count congressional coverage of the universe
+        run: |
+          python scripts/diagnose_congress.py \
+            --lookback-days "${{ inputs.lookback_days }}" \
+            --universe "${{ inputs.universe }}"
