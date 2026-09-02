@@ -26,7 +26,35 @@ def _f(form, filed, items="", doc="doc.htm", accession="a", accepted=None):
 
 def test_event_points_activist_stake_positive():
     assert event_points([_f("SC 13D", "2026-06-01")], AS_OF) == 2.0
-    assert event_points([_f("SC 13G", "2026-06-01")], AS_OF) == 1.0
+    assert event_points([_f("SC 13D/A", "2026-06-01")], AS_OF) == 2.0
+
+
+def test_event_points_ignores_passive_13g():
+    """13G is 94% of stake filings and near-universal over a 365d window, so
+    scoring it adds the same constant to everyone and cannot rank."""
+    assert event_points([_f("SC 13G", "2026-06-01")], AS_OF) == 0.0
+    assert event_points([_f("SC 13G/A", "2026-06-01")], AS_OF) == 0.0
+
+
+def test_event_points_activist_is_capped_not_summed():
+    """13D/A amendments outnumber initial 13Ds 4:1; summing them would let one
+    long-running campaign accrue an unbounded score."""
+    many = [
+        _f("SC 13D", "2026-06-01"),
+        _f("SC 13D/A", "2026-05-01"),
+        _f("SC 13D/A", "2026-04-01"),
+        _f("SC 13D/A", "2026-03-01"),
+    ]
+    assert event_points(many, AS_OF) == 2.0
+
+
+def test_event_points_stake_window_reaches_back_a_year():
+    """The February filing cluster is why: a 120d window ending mid-year saw
+    none of it (measured: 0 in-window across 93 tickers)."""
+    february = _f("SC 13D", "2026-02-12")          # 139 days before AS_OF
+    assert event_points([february], AS_OF) == 2.0
+    too_old = _f("SC 13D", "2025-06-01")           # 395 days — outside 365d
+    assert event_points([too_old], AS_OF) == 0.0
 
 
 def test_event_points_shelf_and_redflag_negative():
