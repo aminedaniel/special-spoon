@@ -2,10 +2,18 @@ name: Weekly stock report
 
 on:
   schedule:
-    # Monday 11:37 UTC (7:37am ET, pre-market). Off-peak minute: GitHub queues
-    # top-of-hour schedules and can delay them by hours. Delivery Routine fires
-    # at 16:00 UTC to allow for remaining schedule delay.
-    - cron: "37 11 * * 1"
+    # Monday 05:37 UTC (overnight, before US market open). The paired delivery
+    # Routine fires at 16:00 UTC, so this start gives ~10.4h of slack for GitHub
+    # to run the queued job before delivery reads the committed report.
+    #
+    # Why so early: GitHub cron is best-effort and can queue for hours. On
+    # 2026-08-31 an 11:37 start was delayed to 18:07 — PAST the 16:00 delivery,
+    # so that week's deep dive found only the prior week's report and was
+    # skipped. 05:37 absorbs a delay of that size (6.5h -> 12:07) and then some.
+    # A weekly screen only needs Friday's close, which is fixed all weekend, so
+    # computing it overnight rather than pre-market changes no data.
+    # Off-peak minute (:37, not :00) avoids the top-of-hour scheduling surge.
+    - cron: "37 5 * * 1"
   workflow_dispatch:
     inputs:
       backfill_tracker:
