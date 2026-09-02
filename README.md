@@ -14,7 +14,7 @@ them by a weighted composite of:
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.09 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.07 | Yahoo Finance via `yfinance` |
-| Corporate events (13D/13G stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
+| Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
@@ -281,13 +281,28 @@ data source fails soft, but a run with no market data cannot rank anything.
   stale in a screen that reruns weekly. Its weight was redistributed across the
   remaining eight. Reinstating it needs a *maintained* free source, which is an open
   v2 item; the code is recoverable from git history.
-- **Corporate-events signal returns nothing so far** — the first live run with SEC
-  credentials scored 0.0 events for all 63 shortlisted names despite 120-day
-  stake/shelf windows. Likely cause: SC 13D/13G are filed *by the holder*, so they
-  may not appear in the subject issuer's own `data.sec.gov` submissions feed, which
-  is what this reads. Unverified — needs a live check against a name known to have a
-  recent 13D. Until then the degenerate-signal guard marks it unavailable and
-  redistributes its 0.09 weight, so it costs nothing but contributes nothing.
+- **Corporate-events signal was seasonally blind — diagnosed and fixed.** It scored
+  ~90% of the universe identically for months. The explanation carried here since #12
+  ("SC 13D/13G are filed *by the holder*, so they may not appear in the issuer's own
+  submissions feed") was **wrong**: a live check found 443 stake filings across ten
+  issuers, form strings matching exactly. The real cause was measured instead
+  (`scripts/diagnose_events.py`, 4210 stake filings over the live universe):
+
+  | month | Jan | **Feb** | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | filings | 590 | **2612** | 110 | 86 | 65 | 69 | 85 | 86 | 85 | 95 | 250 | 77 |
+
+  Schedule 13G amendments are due within 45 days of year end, so 62% of stake
+  filings land in February and a 120-day window ending anywhere in Jun–Dec sees
+  **none** of them — the run found zero in-window across all 93 resolved tickers.
+  The stake window is now 365 days. Separately, the passive 13G family (94% of
+  stake filings, near-universal over a year) is no longer scored at all: it would
+  add the same constant to every ticker and cannot rank, the same inert-scalar
+  reason macro stays unweighted. Only SC 13D/13D/A — the activist form, and the one
+  with documented abnormal returns — scores, flat rather than summed so a
+  long-running campaign's amendments cannot compound. **Not yet validated in the
+  backtest**; it fires where it previously could not, which is a precondition for
+  having predictive power, not evidence of it.
 - **yfinance is unofficial** — Yahoo can change endpoints; per-ticker failures are
   skipped and counted in the report header.
 - Not investment advice; it's an automated research screen.

@@ -3,7 +3,7 @@
 
 Run 3 of diagnose_edgar.py disproved the standing hypothesis: SC 13D/13G DO
 appear in the issuer's own submissions feed (443 of them across 10 issuers),
-with form strings matching EVENT_POINTS exactly. So the signal can see stakes.
+with form strings matching the scorer's exactly. So the signal can see stakes.
 
 Yet the 2026-08-31 report scored 55 of 63 tickers at the identical mid-rank,
 and every differentiated name scored BELOW it -- meaning only the negative
@@ -34,14 +34,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stock_selector.data_sources.edgar import EdgarClient  # noqa: E402
 from stock_selector.data_sources.edgar_filings import (  # noqa: E402
-    EVENT_POINTS,
+    ACTIVIST_FORMS,
+    ACTIVIST_WINDOW_DAYS,
     REDFLAG_WINDOW_DAYS,
     SHELF_FORMS,
     SHELF_WINDOW_DAYS,
-    STAKE_WINDOW_DAYS,
     event_points,
     is_quiet_dump,
 )
+
+# The full 13-series, including the passive 13G family that is no longer
+# scored — the histogram must still show it to justify the exclusion.
+ALL_STAKE_FORMS = ACTIVIST_FORMS | {"SC 13G", "SC 13G/A"}
 
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -67,10 +71,10 @@ def main() -> int:
     client = EdgarClient(ua)
     today = date.today()
     tickers = load_tickers(Path(args.tickers_from))[: args.limit]
-    stake_cutoff = today - timedelta(days=STAKE_WINDOW_DAYS)
+    stake_cutoff = today - timedelta(days=ACTIVIST_WINDOW_DAYS)
 
     print(f"=== events diagnostic — {today} ===")
-    print(f"windows: stake {STAKE_WINDOW_DAYS}d (>= {stake_cutoff}), "
+    print(f"windows: stake {ACTIVIST_WINDOW_DAYS}d (>= {stake_cutoff}), "
           f"shelf {SHELF_WINDOW_DAYS}d, redflag {REDFLAG_WINDOW_DAYS}d\n")
 
     month_hist: Counter = Counter()          # stake filings by calendar month
@@ -96,7 +100,7 @@ def main() -> int:
             form, filed = f["form"], f["filingDate"]
             if not filed:
                 continue
-            if form in EVENT_POINTS:
+            if form in ALL_STAKE_FORMS:
                 stakes_all += 1
                 form_hist[form] += 1
                 month_hist[int(filed[5:7])] += 1
@@ -135,7 +139,7 @@ def main() -> int:
         print(f"  {MONTHS[m-1]}  {n:>5}  {bar}")
 
     print(f"\n[3] STAKE FORMS: all-time {dict(form_hist)}")
-    print(f"    inside the {STAKE_WINDOW_DAYS}d window: {dict(in_window_forms) or 'NONE'}")
+    print(f"    inside the {ACTIVIST_WINDOW_DAYS}d window: {dict(in_window_forms) or 'NONE'}")
 
     print("\n[4] RESULTING event_points DISTRIBUTION")
     total = sum(points_hist.values())

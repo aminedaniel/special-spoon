@@ -1,11 +1,36 @@
 """Corporate-event flags and filing-language similarity from EDGAR.
 
 Events (point-in-time from the submissions feed, no document fetches):
-  +2    SC 13D / 13D/A      activist stake with intent to influence
-  +1    SC 13G / 13G/A      passive >5% stake crossing
+  +2    SC 13D / 13D/A      activist stake with intent to influence (capped:
+                            presence, not count — see below)
   -1    S-3 family          shelf registration (dilution risk)
   -2    8-K with item 4.02  previously issued financials can't be relied on
   -0.5  8-K dumped Friday after hours / weekend (news-timing red flag)
+
+Two things here were measured, not assumed (scripts/diagnose_events.py over
+the live 99-ticker universe, 4210 stake filings):
+
+1. The stake window is 365 days, not 120, because 13-series filings are
+   ANNUAL, not uniform. Filings by calendar month: Feb 2612, Jan 590, Nov 250,
+   every other month 65-110. Schedule 13G amendments are due within 45 days of
+   year end, so 62% of all stake filings land in February. A 120-day window
+   ending anywhere in Jun-Dec therefore cannot see a single one: the live run
+   found NONE in window across all 93 resolved tickers, and 90% of the universe
+   scored exactly 0.0. The signal was seasonally blind for most of the year.
+
+2. The 13G family is NOT scored at all, despite being 94% of stake filings
+   (SC 13G/A 3011, SC 13G 948, vs SC 13D/A 205, SC 13D 46). 13G is the passive
+   >5% crossing that every index fund files; over a 365-day window essentially
+   every issuer has one, so scoring it adds the same constant to every ticker
+   and cannot reorder anything — the same inert-scalar reason macro stays
+   unweighted. Counting them instead would proxy institutional breadth, which
+   is a size effect, not alpha. Only 13D — the activist form, and the one with
+   documented abnormal returns (Brav/Jiang/Partnoy/Thomas 2008) — is scored.
+
+Activist points are flat rather than additive: 13D/A amendments outnumber
+initial 13Ds 4:1, so summing them would let one long-running campaign accrue
+an unbounded score. Presence of an activist situation is the signal; the
+number of amendments filed about it is not.
 
 The shelf match covers the whole family — the live diagnostic found zero
 plain "S-3" strings across nine issuers' decade-long feeds because real
@@ -33,16 +58,14 @@ from .edgar import EdgarClient
 
 log = logging.getLogger(__name__)
 
-STAKE_WINDOW_DAYS = 120
+ACTIVIST_WINDOW_DAYS = 365   # 13-series filings cluster in February — see docstring
 SHELF_WINDOW_DAYS = 120
 REDFLAG_WINDOW_DAYS = 60
 
-EVENT_POINTS = {
-    "SC 13D": 2.0,
-    "SC 13D/A": 2.0,
-    "SC 13G": 1.0,
-    "SC 13G/A": 1.0,
-}
+# Only the activist family scores. The passive 13G family is deliberately
+# absent — it is 94% of stake filings and near-universal, so it cannot rank.
+ACTIVIST_FORMS = {"SC 13D", "SC 13D/A"}
+ACTIVIST_POINTS = 2.0        # flat if any in window, never summed
 # The whole shelf family, not just plain S-3 — see module docstring.
 SHELF_FORMS = {"S-3", "S-3/A", "S-3ASR", "S-3MEF", "F-3", "F-3/A", "F-3ASR"}
 SHELF_POINTS = -1.0
@@ -77,20 +100,25 @@ SHINGLE_WORDS = 5
 def event_points(
     filings: list[dict], as_of: date
 ) -> float:
-    """Sum event points for filings inside each event type's window."""
-    stake_cutoff = (as_of - timedelta(days=STAKE_WINDOW_DAYS)).isoformat()
+    """Sum event points for filings inside each event type's window.
+
+    Activist presence contributes a single flat ACTIVIST_POINTS regardless of
+    how many 13D/13D/A filings fall in the window; the negatives still sum.
+    """
+    activist_cutoff = (as_of - timedelta(days=ACTIVIST_WINDOW_DAYS)).isoformat()
     shelf_cutoff = (as_of - timedelta(days=SHELF_WINDOW_DAYS)).isoformat()
     redflag_cutoff = (as_of - timedelta(days=REDFLAG_WINDOW_DAYS)).isoformat()
     as_of_iso = as_of.isoformat()
 
     points = 0.0
+    has_activist = False
     for f in filings:
         filed = f["filingDate"]
         if not filed or filed > as_of_iso:
             continue
         form = f["form"]
-        if form in EVENT_POINTS and filed >= stake_cutoff:
-            points += EVENT_POINTS[form]
+        if form in ACTIVIST_FORMS and filed >= activist_cutoff:
+            has_activist = True
         elif form in SHELF_FORMS and filed >= shelf_cutoff:
             points += SHELF_POINTS
         elif form == "8-K" and filed >= redflag_cutoff:
@@ -98,6 +126,8 @@ def event_points(
                 points -= 2.0
             if is_quiet_dump(f.get("acceptanceDateTime")):
                 points += QUIET_DUMP_POINTS
+    if has_activist:
+        points += ACTIVIST_POINTS
     return points
 
 
