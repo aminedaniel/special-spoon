@@ -1,0 +1,36 @@
+name: Diagnose Events Signal
+
+# Manual only. Answers why the events signal scores ~87% of the shortlist
+# identically, now that run 3 of the EDGAR diagnostic disproved the standing
+# "stakes are invisible to the issuer feed" hypothesis. Reads submissions
+# feeds only — no document fetches — so it is fast. Writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many universe tickers to inspect"
+        type: string
+        default: "99"
+      show:
+        description: "Per-ticker rows to print"
+        type: string
+        default: "25"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Inspect the events signal against live filings
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: |
+          python scripts/diagnose_events.py \
+            --limit "${{ inputs.limit }}" \
+            --show "${{ inputs.show }}"
