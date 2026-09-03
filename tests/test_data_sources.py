@@ -43,6 +43,16 @@ FORM4_XML = """<?xml version="1.0"?>
 """
 
 
+# Same filing, but flagged as executed under a Rule 10b5-1 plan. Live filings
+# use both encodings ("1"/"0" and "true"/"false"); both are covered.
+FORM4_PLANNED_XML = FORM4_XML.replace(
+    "<ownershipDocument>", "<ownershipDocument>\n  <aff10b5One>1</aff10b5One>"
+)
+FORM4_PLANNED_XML_BOOL = FORM4_XML.replace(
+    "<ownershipDocument>", "<ownershipDocument>\n  <aff10b5One>true</aff10b5One>"
+)
+
+
 def _client_with_map(cik_map) -> EdgarClient:
     client = EdgarClient("test-suite test@example.com")
     client._cik_map = cik_map
@@ -56,6 +66,15 @@ def test_form4_parse_nets_open_market_only():
     assert rec["sell"] == 2000.0
     assert rec["owner_cik"] == "0001111111"
     assert rec["is_officer"] and not rec["is_director"]
+    assert rec["is_planned"] is False   # no aff10b5One element at all
+
+
+def test_form4_parse_reads_10b5_1_flag_in_both_encodings():
+    """Live filings encode the checkbox as 1/0 and as true/false; 47% of real
+    Form 4s carry it set, so misreading it would silently discard half the
+    exclusions."""
+    assert sec_insider.parse_form4(FORM4_PLANNED_XML)["is_planned"] is True
+    assert sec_insider.parse_form4(FORM4_PLANNED_XML_BOOL)["is_planned"] is True
 
 
 def test_form4_history_scoped_to_issuer_submissions():
@@ -122,6 +141,65 @@ def test_officer_buy_outweighs_director_buy():
           "owner_cik": "x", "is_officer": False, "is_director": True}], today, 14
     )
     assert officer["signal_dollars"] == 2 * director["signal_dollars"]
+
+
+def test_planned_buy_excluded_from_score_but_kept_in_raw_totals():
+    """Cohen/Malloy/Pomorski: scheduled trades carry no information. A 10b5-1
+    buy must not score, but must still reconcile against EDGAR."""
+    today = date.today()
+    planned = sec_insider.window_activity(
+        [{"date": today, "buy": 50000.0, "sell": 0.0, "owner_cik": "a",
+          "is_officer": True, "is_director": False, "is_planned": True}], today, 14
+    )
+    assert planned["signal_dollars"] == 0.0     # contributes nothing to the rank
+    assert planned["buy_dollars"] == 50000.0    # but the raw truth is unchanged
+    assert planned["net_dollars"] == 50000.0
+    assert planned["planned_filings"] == 1
+    assert planned["distinct_buyers"] == 0      # cannot manufacture a cluster
+
+
+def test_planned_sells_do_not_penalize():
+    """The sign consequence, asserted deliberately: dropping scheduled sells
+    RAISES the score for issuers whose insiders sell on a plan."""
+    today = date.today()
+    def sale(planned):
+        return sec_insider.window_activity(
+            [{"date": today, "buy": 0.0, "sell": 80000.0, "owner_cik": "a",
+              "is_officer": True, "is_director": False, "is_planned": planned}],
+            today, 14,
+        )
+    assert sale(True)["signal_dollars"] == 0.0
+    assert sale(False)["signal_dollars"] < 0.0
+    assert sale(True)["sell_dollars"] == sale(False)["sell_dollars"] == 80000.0
+
+
+def test_planned_buyers_excluded_from_cluster_count():
+    """Three buyers where two are on plans is a one-insider event, not a
+    cluster — otherwise scheduled buying inflates the strongest configuration
+    in the literature."""
+    today = date.today()
+    def rec(cik, planned):
+        return {"date": today, "buy": 10000.0, "sell": 0.0, "owner_cik": cik,
+                "is_officer": False, "is_director": True, "is_planned": planned}
+    mixed = sec_insider.window_activity(
+        [rec("a", False), rec("b", True), rec("c", True)], today, 14
+    )
+    assert mixed["distinct_buyers"] == 1
+    assert mixed["planned_filings"] == 2
+    solo = sec_insider.window_activity([rec("a", False)], today, 14)
+    assert mixed["signal_dollars"] == solo["signal_dollars"]
+
+
+def test_records_without_the_flag_are_treated_as_discretionary():
+    """Backward compatibility: pre-2023 records and failed parses carry no
+    is_planned key and must keep their old behaviour, not vanish."""
+    today = date.today()
+    legacy = sec_insider.window_activity(
+        [{"date": today, "buy": 10000.0, "sell": 0.0, "owner_cik": "a",
+          "is_officer": False, "is_director": True}], today, 14
+    )
+    assert legacy["signal_dollars"] > 0
+    assert legacy["planned_filings"] == 0
 
 
 def test_sells_discounted_not_cancelling():
