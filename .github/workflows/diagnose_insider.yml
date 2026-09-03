@@ -1,0 +1,41 @@
+name: Diagnose Insider Plans
+
+# Manual only. Establishes, against live filings, whether Form 4 exposes a
+# structured Rule 10b5-1 flag — the disclosed fact that Cohen/Malloy/Pomorski
+# (2012) had to approximate with a timing proxy. Decides how the routine vs
+# opportunistic split gets implemented. Writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: "Comma-separated tickers to sample"
+        type: string
+        default: "RNG,DBX,YELP,CRTO,PRGS"
+      years:
+        description: "Years of Form 4 history to pull per ticker"
+        type: string
+        default: "3"
+      max_per_ticker:
+        description: "Cap on Form 4 documents fetched per ticker"
+        type: string
+        default: "180"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Inspect Form 4 schema and scheduling disclosure
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: |
+          python scripts/diagnose_insider_plans.py \
+            --tickers "${{ inputs.tickers }}" \
+            --years "${{ inputs.years }}" \
+            --max-per-ticker "${{ inputs.max_per_ticker }}"
