@@ -102,7 +102,10 @@ def test_form4_history_scoped_to_issuer_submissions():
     assert activity["net_dollars"] == 17000.0
     # Both filings are the same officer: weighted buys 2 * 10500 * 2.0,
     # one distinct buyer so no cluster multiplier, sells discounted 0.25.
-    assert activity["signal_dollars"] == 2 * 10500.0 * 2.0 - 0.25 * 4000.0
+    # Buy and sell arrive separately now; netting them in dollars let a
+    # 1,145:1 sell-to-buy ratio drown the buy signal entirely.
+    assert activity["buy_conviction"] == 2 * 10500.0 * 2.0
+    assert activity["sell_pressure"] == 4000.0
     assert activity["distinct_buyers"] == 1
 
 
@@ -126,7 +129,7 @@ def test_cluster_of_distinct_buyers_outscores_one_whale():
         [rec("a", 10000.0), rec("b", 10000.0), rec("c", 10000.0)], today, 14
     )
     whale = sec_insider.window_activity([rec("a", 30000.0)], today, 14)
-    assert cluster["signal_dollars"] > whale["signal_dollars"]
+    assert cluster["buy_conviction"] > whale["buy_conviction"]
     assert cluster["net_dollars"] == whale["net_dollars"] == 30000.0
 
 
@@ -140,7 +143,7 @@ def test_officer_buy_outweighs_director_buy():
         [{"date": today, "buy": 10000.0, "sell": 0.0,
           "owner_cik": "x", "is_officer": False, "is_director": True}], today, 14
     )
-    assert officer["signal_dollars"] == 2 * director["signal_dollars"]
+    assert officer["buy_conviction"] == 2 * director["buy_conviction"]
 
 
 def test_planned_buy_excluded_from_score_but_kept_in_raw_totals():
@@ -151,7 +154,7 @@ def test_planned_buy_excluded_from_score_but_kept_in_raw_totals():
         [{"date": today, "buy": 50000.0, "sell": 0.0, "owner_cik": "a",
           "is_officer": True, "is_director": False, "is_planned": True}], today, 14
     )
-    assert planned["signal_dollars"] == 0.0     # contributes nothing to the rank
+    assert planned["buy_conviction"] == 0.0     # contributes nothing to the rank
     assert planned["buy_dollars"] == 50000.0    # but the raw truth is unchanged
     assert planned["net_dollars"] == 50000.0
     assert planned["planned_filings"] == 1
@@ -168,8 +171,8 @@ def test_planned_sells_do_not_penalize():
               "is_officer": True, "is_director": False, "is_planned": planned}],
             today, 14,
         )
-    assert sale(True)["signal_dollars"] == 0.0
-    assert sale(False)["signal_dollars"] < 0.0
+    assert sale(True)["sell_pressure"] == 0.0
+    assert sale(False)["sell_pressure"] == 80000.0
     assert sale(True)["sell_dollars"] == sale(False)["sell_dollars"] == 80000.0
 
 
@@ -187,7 +190,7 @@ def test_planned_buyers_excluded_from_cluster_count():
     assert mixed["distinct_buyers"] == 1
     assert mixed["planned_filings"] == 2
     solo = sec_insider.window_activity([rec("a", False)], today, 14)
-    assert mixed["signal_dollars"] == solo["signal_dollars"]
+    assert mixed["buy_conviction"] == solo["buy_conviction"]
 
 
 def test_records_without_the_flag_are_treated_as_discretionary():
@@ -198,7 +201,7 @@ def test_records_without_the_flag_are_treated_as_discretionary():
         [{"date": today, "buy": 10000.0, "sell": 0.0, "owner_cik": "a",
           "is_officer": False, "is_director": True}], today, 14
     )
-    assert legacy["signal_dollars"] > 0
+    assert legacy["buy_conviction"] > 0
     assert legacy["planned_filings"] == 0
 
 
@@ -211,7 +214,8 @@ def test_sells_discounted_not_cancelling():
          {"date": today, "buy": 0.0, "sell": 40000.0,
           "owner_cik": "b", "is_officer": True, "is_director": False}], today, 14
     )
-    assert mixed["signal_dollars"] > 0          # shaped score stays positive
+    assert mixed["buy_conviction"] > 0          # the buy still registers
+    assert mixed["sell_pressure"] == 40000.0    # and the sale is not netted away
     assert mixed["net_dollars"] == -20000.0     # raw truth still reported
 
 
