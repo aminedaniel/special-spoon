@@ -9,7 +9,7 @@ them by a weighted composite of:
 | Technicals (12-1 momentum, trend, breakout, volume) | 0.09 | Yahoo Finance via `yfinance` |
 | Fundamentals (growth, debt, ROE, margins) | 0.13 | Yahoo Finance via `yfinance` |
 | Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.09 | Yahoo Finance statements via `yfinance` |
-| Insider activity (officer-weighted cluster buys, discounted sells, 90d) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
+| Insider activity (officer-weighted cluster buys, discounted sells, 90d, **excl. 10b5-1 planned trades**) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
 | Stability (low beta vs QQQ + low idiosyncratic vol) | 0.05 | Yahoo Finance via `yfinance` |
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
 | Quality (accrual gap, share dilution) | 0.09 | Yahoo Finance financial fields + share history |
