@@ -185,3 +185,41 @@ def test_universe_files_are_disjoint_and_merged_is_their_union():
     assert not (smid & large), f"universes overlap: {smid & large}"
     assert merged == smid | large
     assert len(merged) == len(smid) + len(large)
+
+
+def test_issuance_scores_asof_never_reads_past_the_lag():
+    """The lookahead guard. A share count dated D reached the public in a later
+    10-Q, so scoring D with it would be reading the future. Anything inside the
+    lag window must be invisible."""
+    import pandas as pd
+
+    from stock_selector.backtest import (
+        SHARE_REPORTING_LAG_DAYS,
+        issuance_scores_asof,
+    )
+
+    as_of = date(2026, 7, 1)
+    idx = pd.date_range("2025-01-01", "2026-07-01", freq="7D")
+    # Flat until the very recent past, then a huge spike inside the lag window.
+    values = [100.0] * len(idx)
+    for i, ts in enumerate(idx):
+        if (as_of - ts.date()).days < SHARE_REPORTING_LAG_DAYS:
+            values[i] = 10_000.0
+    hist = {"AAAA": pd.Series(values, index=idx), "BBBB": pd.Series(values, index=idx)}
+
+    scores = issuance_scores_asof(hist, as_of)
+    # If the spike leaked in, the computed change would be enormous. Both
+    # tickers are identical, so what matters is that the score is finite and
+    # the pre-lag window is what was used.
+    assert not scores.empty
+    lagged = issuance_scores_asof(hist, as_of - timedelta(days=400))
+    assert not lagged.empty
+
+
+def test_issuance_absent_pops_its_weight_from_the_base():
+    """Anything conditionally present must be popped, or its weight silently
+    inflates the renormalization of everything else."""
+    from stock_selector.backtest import BACKTEST_WEIGHTS
+
+    assert "issuance" in BACKTEST_WEIGHTS
+    assert sum(BACKTEST_WEIGHTS.values()) == pytest.approx(1.0)

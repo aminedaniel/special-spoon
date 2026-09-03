@@ -9,9 +9,19 @@ Only signals that are truly reconstructable as-of a past date participate:
   - events:         13D/13G/shelf/8-K filings dated on/before the date
   - filing_text (opt-in, document-heavy): periodic reports filed by the date
 
-Fundamentals, valuation, quality, and short interest are EXCLUDED:
-free sources only serve current snapshots for those, and scoring the past
-with today's data is lookahead bias dressed up as results.
+  - issuance: share count as-of the date, from dated history, lagged
+
+Fundamentals, valuation, quality, and short interest are EXCLUDED: free
+sources only serve current snapshots for those, and scoring the past with
+today's data is lookahead bias dressed up as results.
+
+Issuance is the one member of that family that escapes the rule, because
+get_shares_full returns a DATED series rather than a snapshot. It carries a
+SHARE_REPORTING_LAG_DAYS offset, since a share count dated D only reached the
+public in a later 10-Q. Read its IC with that caveat attached: the diagnostic
+established Yahoo's index is not quarter-end dated, but could not establish
+that history is never restated, so a residual lookahead risk remains that the
+lag mitigates rather than eliminates.
 
 Each rebalance: score the universe as-of that date -> take top N -> hold to
 the next rebalance -> record equal-weight return vs benchmarks, plus each
@@ -27,32 +37,41 @@ inflates absolute returns; relative signal comparisons are less affected).
 from __future__ import annotations
 
 import logging
+import statistics
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import pandas as pd
+import yfinance as yf
 
 from . import adaptive
-from .data_sources import earnings, edgar_filings, sec_insider
+from .data_sources import earnings, edgar_filings, market_data, sec_insider
 from .data_sources.edgar import EdgarClient
 from .scoring import composite_score
 from .signals import earnings_drift as earnings_drift_signal
 from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import insider as insider_signal
+from .signals import issuance as issuance_signal
 from .signals import stability as stability_signal
 from .signals import technical as technical_signal
 
 log = logging.getLogger(__name__)
 
 BENCHMARKS = ["QQQ", "IWM"]
+# Share counts become public via a 10-Q, so a count dated D was not knowable
+# on D. Set conservatively: the diagnostic could establish that Yahoo's index
+# is not quarter-end dated, but not that history is never restated.
+SHARE_REPORTING_LAG_DAYS = 45
+
 BACKTEST_WEIGHTS = {  # base weights over the point-in-time signal set
-    "technical": 0.30,
-    "insider": 0.20,
-    "earnings_drift": 0.15,
-    "events": 0.15,
-    "stability": 0.10,
-    "filing_text": 0.10,
+    "technical": 0.28,
+    "insider": 0.18,
+    "earnings_drift": 0.14,
+    "events": 0.14,
+    "issuance": 0.10,
+    "stability": 0.08,
+    "filing_text": 0.08,
 }
 STABILITY_LOOKBACK_DAYS = 365  # match the live signal's ~1y beta window
 
@@ -157,6 +176,64 @@ def collect_edgar_histories(
     return {"form4": form4, "filings": filings, "text_cache": {} if include_filing_text else None}
 
 
+def collect_share_histories(tickers: list[str], since: date) -> dict[str, object]:
+    """Full share-count history per ticker, fetched once and sliced per date.
+
+    This is the ONLY fundamentals-family source that can be reconstructed
+    point-in-time. fetch_fundamentals and friends read yfinance `.info`, which
+    serves a single current snapshot — scoring 2023 with today's P/E is
+    lookahead, which is why fundamentals, valuation, quality and short interest
+    stay out of this loop. get_shares_full returns a DATED series, so the share
+    count as of a past rebalance can be read honestly.
+    """
+    out: dict[str, object] = {}
+    for t in tickers:
+        try:
+            raw = yf.Ticker(t).get_shares_full(start=since.isoformat())
+            if raw is None or len(raw) < 2:
+                continue
+            series = market_data.normalize_share_index(raw)
+            if len(series) >= 2:
+                out[t] = series
+        except Exception as exc:  # noqa: BLE001 — per-ticker failure is non-fatal
+            log.debug("share history failed for %s: %s", t, exc)
+    log.info("share histories: %d/%d tickers", len(out), len(tickers))
+    return out
+
+
+def issuance_scores_asof(
+    histories: dict[str, object], as_of: date
+) -> pd.Series:
+    """Trailing-year share-count change as-of a date, split-adjusted.
+
+    Two guards against lookahead, both deliberate:
+
+    - nothing dated after `as_of - SHARE_REPORTING_LAG_DAYS` is read. Share
+      counts reach the public through a 10-Q, so the count "as of" a date was
+      not knowable on that date. The diagnostic found Yahoo's index is NOT
+      clustered on quarter ends (median 23 days off, 12% within 5), so it looks
+      like an update feed rather than filing dates — but that cannot rule out
+      restatement of history, so the lag is set conservatively.
+    - the window is a trailing slice, not everything-to-date, matching
+      stability_scores_asof: letting it grow would change what the signal means
+      at later rebalances.
+    """
+    visible = as_of - timedelta(days=SHARE_REPORTING_LAG_DAYS)
+    lo = visible - timedelta(days=market_data.SHARE_LOOKBACK_DAYS)
+    changes: dict[str, float] = {}
+    for t, series in histories.items():
+        window = series[(series.index.date > lo) & (series.index.date <= visible)]
+        if len(window) < 2:
+            continue
+        adjusted = market_data.split_adjust([float(v) for v in window.to_numpy()])
+        k = min(market_data.SHARE_ENDPOINT_OBS, len(adjusted) // 2) or 1
+        begin = statistics.median(adjusted[:k])
+        if begin <= 0:
+            continue
+        changes[t] = statistics.median(adjusted[-k:]) / begin - 1.0
+    return issuance_signal.score(pd.Series(changes, dtype="float64"))
+
+
 def collect_earnings_histories(tickers: list[str]) -> dict:
     """Dated earnings frames per ticker, fetched once and windowed per
     rebalance by surprise_asof (network call — CLI-side, not in the pure loop)."""
@@ -207,6 +284,10 @@ def scores_asof(
             }
         ),
     }
+    if histories.get("shares"):
+        out["issuance"] = issuance_scores_asof(
+            histories["shares"], as_of
+        ).reindex(tickers)
     if histories.get("earnings") is not None:
         out["earnings_drift"] = earnings_drift_signal.score(
             {t: _surprise_or_none(histories["earnings"].get(t), t, as_of) for t in tickers}
@@ -239,6 +320,10 @@ def run_backtest(
         base.pop("filing_text")
     if histories.get("earnings") is None:
         base.pop("earnings_drift")
+    if not histories.get("shares"):
+        # Anything conditionally present must be popped, or its weight
+        # silently inflates the renormalization below.
+        base.pop("issuance")
     total = sum(base.values())
     base = {k: v / total for k, v in base.items()}
 
@@ -390,7 +475,9 @@ def render_markdown(result: BacktestResult, top_n: int, step_weeks: int) -> str:
         "*Caveats: survivorship bias (today's universe excludes delisted names, "
         "inflating absolute returns); fundamentals/valuation/quality/short-interest "
         "signals are excluded because free sources only provide current "
-        "snapshots (using them historically would be lookahead). Research output, "
+        "snapshots (using them historically would be lookahead); issuance is "
+        "included because share history is dated, lagged "
+        f"{SHARE_REPORTING_LAG_DAYS}d for reporting. Research output, "
         "not investment advice.*",
         "",
     ]
