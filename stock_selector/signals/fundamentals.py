@@ -3,6 +3,16 @@
 Valuation multiples (P/E, P/S, EV/…) live in the separate `valuation` signal,
 so this category isn't double-counting cheapness — it scores business quality
 (growth, returns, leverage, margins) independent of price.
+
+Dividend yield used to be a fifth sub-score and was removed. Its docstring
+called it a "small weightless bonus", but the code gave it a full 1/5 of the
+category — and `.fillna(0.0)` meant it was never NaN, so unlike every other
+sub-score it could not drop out for a ticker that lacked it. In a universe of
+small/mid-cap tech most names pay nothing, so the whole non-paying cohort tied
+at one shared rank and the sub-score degenerated into a near-binary "pays a
+dividend" flag carrying 20% of the weight. It also appears in none of the
+factor literature this project cites, and for growth-stage tech a payout is
+at best ambiguous — it signals a company with fewer places to reinvest.
 """
 
 from __future__ import annotations
@@ -21,7 +31,6 @@ def score(fundamentals: pd.DataFrame) -> pd.Series:
       - debtToEquity: lower is better
       - returnOnEquity: higher is better
       - grossMargins: higher is better
-      - dividendYield: higher is better (small weightless bonus for cash return)
     """
     f = fundamentals
 
@@ -37,9 +46,6 @@ def score(fundamentals: pd.DataFrame) -> pd.Series:
     )
     subs["gross_margins"] = percentile_score(
         pd.to_numeric(f.get("grossMargins"), errors="coerce")
-    )
-    subs["dividend_yield"] = percentile_score(
-        pd.to_numeric(f.get("dividendYield"), errors="coerce").fillna(0.0)
     )
 
     return combine_subscores(subs).replace([np.inf, -np.inf], np.nan)

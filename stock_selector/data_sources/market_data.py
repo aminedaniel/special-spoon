@@ -21,7 +21,7 @@ FUNDAMENTAL_FIELDS = [
     "forwardPE",
     "revenueGrowth",
     "debtToEquity",
-    "dividendYield",
+    "dividendYield",   # fetched for reporting only — not scored, see signals/fundamentals.py
     "returnOnEquity",
     "grossMargins",
     "operatingCashflow",
