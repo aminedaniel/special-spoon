@@ -23,7 +23,8 @@ def _config() -> Config:
             "earnings_drift": 0.11,
             "stability": 0.05,
             "insider": 0.14,
-            "quality": 0.09,
+            "quality": 0.045,
+            "issuance": 0.045,
             "short_interest": 0.07,
             "events": 0.08,
             "filing_text": 0.08,
@@ -87,6 +88,8 @@ def test_full_run_includes_stage_b(
     mock_sim.return_value = {
         t: 0.9 - 0.05 * i for i, t in enumerate(TICKERS[:4])
     }
+    # Distinct per ticker: an identical value across the shortlist is a
+    # degenerate category and the pipeline drops it by design.
     mock_shares.return_value = pd.Series(
         {t: 0.02 * (i + 1) for i, t in enumerate(TICKERS[:4])}
     )
@@ -116,6 +119,7 @@ def test_full_run_includes_stage_b(
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
     assert "score_quality" in result.rankings.columns
+    assert "score_issuance" in result.rankings.columns
     events = result.rankings["score_events"]
     assert events["BBBB"] == events.max()  # the 13D holder ranks top on events
     drift = result.rankings["score_earnings_drift"]

@@ -14,7 +14,12 @@ weights:
   fundamentals: 0.13     # growth + balance-sheet quality (valuation moved out)
   earnings_drift: 0.11   # PEAD/SUE; measured flat, but on only ~20 scored names/period
   technical: 0.09        # 12-1 momentum; best of a weak field (+0.013, t=0.47) but not significant
-  quality: 0.09          # accruals gap + share-count dilution
+  quality: 0.045         # accruals gap alone (Sloan). Green/Hand/Soliman 2011 find
+                         # this anomaly largely gone post-publication; held small.
+  issuance: 0.045        # net share issuance. Best replication record in this table:
+                         # survived Hou/Xue/Zhang 2020 where ~65% of 452 anomalies
+                         # failed. Split out of quality, NOT reweighted — 0.09 was
+                         # already half issuance. Unvalidated here pending backtest.
   events: 0.08           # 13D stakes, shelves, 8-K red flags; measured ~0.000 over 53 periods
   filing_text: 0.08      # 10-Q/10-K language stability ("lazy prices")
   profitability: 0.09    # GP/assets (Novy-Marx) + asset growth (CMA) — best-replicated factors

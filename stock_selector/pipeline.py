@@ -25,6 +25,7 @@ from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import fundamentals as fundamentals_signal
 from .signals import insider as insider_signal
+from .signals import issuance as issuance_signal
 from .signals import profitability as profitability_signal
 from .signals import quality as quality_signal
 from .signals import short_interest as short_interest_signal
@@ -106,10 +107,20 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
                 "Insider/events/filing-text signals skipped: SEC_EDGAR_USER_AGENT "
                 "not set (see .env.example)"
             )
-        share_change = market_data.fetch_share_change(shortlist)
         category_scores["quality"] = quality_signal.score(
-            gated.loc[gated.index.intersection(shortlist)], share_change
+            gated.loc[gated.index.intersection(shortlist)]
         )
+
+        share_change = market_data.fetch_share_change(shortlist)
+        covered = share_change.dropna()
+        if len(covered) >= 2:
+            category_scores["issuance"] = issuance_signal.score(share_change)
+        else:
+            notes.append(
+                "Issuance signal unavailable: share-count history returned for "
+                f"only {len(covered)} of {len(shortlist)} tickers; its weight "
+                "was redistributed"
+            )
 
         prof_metrics = market_data.fetch_profitability_metrics(shortlist)
         category_scores["profitability"] = profitability_signal.score(prof_metrics)

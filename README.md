@@ -12,7 +12,8 @@ them by a weighted composite of:
 | Insider activity (officer-weighted cluster buys, discounted sells, 90d, **excl. 10b5-1 planned trades**) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
 | Stability (low beta vs QQQ + low idiosyncratic vol) | 0.05 | Yahoo Finance via `yfinance` |
 | Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
-| Quality (accrual gap, share dilution) | 0.09 | Yahoo Finance financial fields + share history |
+| Quality (accrual gap) | 0.045 | Yahoo Finance financial fields |
+| Net share issuance (buybacks good, stock-comp bloat bad) | 0.045 | Yahoo Finance share-count history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.07 | Yahoo Finance via `yfinance` |
 | Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices", year-over-year) | 0.08 | SEC EDGAR 10-Q/10-K text diff |
