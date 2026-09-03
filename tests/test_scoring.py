@@ -106,3 +106,28 @@ def test_dropping_a_degenerate_category_changes_no_order_but_frees_weight():
     # But dropping it lets the real signal carry its own full range.
     assert with_flat["composite"]["b"] == pytest.approx(70.0)
     assert without["composite"]["b"] == pytest.approx(90.0)
+
+
+def test_percentile_score_is_idempotent():
+    """Why re-ranking categories over the shortlist is safe: ranking an already
+    ranked series reproduces it, so when the shortlist equals the gated
+    universe the re-rank is exactly a no-op."""
+    s = pd.Series({"a": 3.0, "b": 1.0, "c": 2.0, "d": 2.0})
+    once = percentile_score(s)
+    twice = percentile_score(once)
+    pd.testing.assert_series_equal(once, twice)
+
+
+def test_percentile_score_rescales_when_restricted_to_a_subset():
+    """And why it matters once the shortlist is a strict subset: the top slice
+    of a universe is compressed into the upper percentiles until re-ranked, so
+    it would not share a scale with signals ranked on the subset directly."""
+    universe = pd.Series({t: float(i) for i, t in enumerate("abcdefghij")})
+    top3 = ["j", "i", "h"]
+
+    sliced = percentile_score(universe).reindex(top3)
+    reranked = percentile_score(percentile_score(universe).reindex(top3))
+
+    assert sliced.min() >= 80.0            # squashed into the top of the range
+    assert reranked.min() == pytest.approx(100 / 3)   # spread over the subset
+    assert list(sliced.sort_values().index) == list(reranked.sort_values().index)
