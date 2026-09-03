@@ -1,0 +1,43 @@
+name: Diagnose Analyst Revisions
+
+# Manual only. Decides whether an analyst estimate-revision signal can be built
+# and backtested HONESTLY on this universe, before any of it is written.
+#
+# Two pre-committed stop conditions:
+#   - if the data is per-period snapshots rather than dated point-in-time
+#     consensus, a backtest would score the past with today's estimates and no
+#     weighting could be justified from it;
+#   - if fewer than ~40 of 99 tickers have usable history, the column is
+#     near-constant and the degenerate guard drops it anyway.
+#
+# Requires a FINNHUB_API_KEY secret. Writes nothing; never logs the key.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many universe tickers to check coverage across"
+        type: string
+        default: "99"
+      probe_ticker:
+        description: "Ticker used for the endpoint/schema probe"
+        type: string
+        default: "RNG"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Probe analyst-estimate data availability
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          python scripts/diagnose_revisions.py \
+            --limit "${{ inputs.limit }}" \
+            --probe-ticker "${{ inputs.probe_ticker }}"
