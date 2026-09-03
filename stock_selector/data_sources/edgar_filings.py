@@ -41,10 +41,17 @@ The Friday flag is the disclosure-timing effect (deHaan/Shevlin/Thornock):
 managers strategically file bad news when nobody is watching — after the
 close on Friday or on weekends — and the market underreacts to it.
 
-Filing text ("lazy prices"): similarity between the issuer's two most recent
-same-form periodic reports (10-Q vs prior 10-Q, else 10-K vs prior 10-K).
-Companies that quietly rewrite their filings tend to underperform, so HIGHER
-similarity scores better. Documents are fetched once and cached per run.
+Filing text ("lazy prices", Cohen/Malloy/Nguyen 2020): similarity between the
+issuer's newest periodic report and the SAME period one year earlier — 10-Q vs
+the year-ago 10-Q, else 10-K vs prior 10-K. Companies that quietly rewrite
+their filings tend to underperform, so HIGHER similarity scores better.
+Documents are fetched once and cached per run.
+
+Year-over-year matters: comparing consecutive quarters scores seasonal
+boilerplate as a rewrite, and because Q4 is reported in the 10-K, a Q1
+filing's "previous" 10-Q is the prior year's Q3 — a six-month gap across the
+annual-report boundary where filers refresh language anyway. See
+latest_report_pair for the full argument.
 """
 
 from __future__ import annotations
@@ -91,6 +98,16 @@ def is_quiet_dump(acceptance: str | None) -> bool:
         return False
     weekday, hour = d.weekday(), int(m.group(2))
     return weekday >= 5 or (weekday == 4 and hour >= 16)
+
+# Year-over-year pairing for the filing-language signal. The +/-75d band around
+# 365 admits exactly the four-quarters-back filing and nothing else: three
+# quarters (274d) and five quarters (456d) both sit 91 days from target, so
+# they are rejected with 16 days to spare, while ordinary filing-date drift
+# (rarely more than a few weeks) is absorbed. An issuer that shifts its fiscal
+# calendar far enough to fall outside simply yields None, which costs the
+# ticker this one category rather than scoring it wrongly.
+YEAR_GAP_DAYS = 365
+YEAR_GAP_TOLERANCE_DAYS = 75
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
@@ -166,8 +183,29 @@ def shingle_similarity(a: str, b: str, k: int = SHINGLE_WORDS) -> float:
 def latest_report_pair(
     filings: list[dict], as_of: date
 ) -> tuple[dict, dict] | None:
-    """Two most recent same-form periodic reports filed on/before as_of:
-    prefer consecutive 10-Qs, fall back to consecutive 10-Ks."""
+    """The newest periodic report on/before as_of, paired with the SAME period
+    one year earlier. None when no such partner exists.
+
+    Year-over-year, not consecutive. Cohen/Malloy/Nguyen compare a filing to
+    the same quarter a year back precisely because quarterly reports carry
+    seasonal, non-informative language — holiday-quarter revenue discussion,
+    annual guidance resets, seasonal working-capital MD&A. Comparing Q3 to Q2
+    scores that routine boilerplate as a "rewrite".
+
+    Consecutive 10-Ks are already a year apart, so that path was accidentally
+    right; it is the 10-Q path — which essentially every domestic filer takes —
+    that was wrong. Worse, because Q4 is reported in the 10-K rather than a
+    10-Q, the "consecutive" partner for a Q1 filing was the PRIOR year's Q3: a
+    six-month gap straddling the annual-report boundary, exactly where filers
+    refresh their language. Gap length was therefore not even constant (three
+    months thrice a year, six months once), and the resulting similarity drop
+    was systematic and fiscal-calendar-aligned across the whole universe.
+
+    Returning None rather than falling back to an adjacent quarter is
+    deliberate: the composite renormalizes over the categories a ticker
+    actually has, so an absent signal costs nothing, while a wrong one is
+    scored as if it meant something.
+    """
     as_of_iso = as_of.isoformat()
     for form in ("10-Q", "10-K"):
         matches = [
@@ -178,9 +216,41 @@ def latest_report_pair(
             and f["filingDate"] <= as_of_iso
             and f["primaryDocument"]
         ]
-        if len(matches) >= 2:
-            return matches[0], matches[1]
+        if len(matches) < 2:
+            continue
+        latest = matches[0]
+        prior = _year_earlier(latest, matches[1:])
+        if prior is not None:
+            return latest, prior
     return None
+
+
+def _year_earlier(latest: dict, candidates: list[dict]) -> dict | None:
+    """The candidate closest to a year before `latest`, or None if the nearest
+    still falls outside YEAR_GAP_TOLERANCE_DAYS.
+
+    Filing dates drift — an issuer may file 10 days earlier one year and 20
+    later the next — so this takes the nearest match inside a band rather than
+    counting positions back. Counting would silently mis-pair any issuer that
+    skipped or amended a filing.
+    """
+    try:
+        anchor = date.fromisoformat(latest["filingDate"])
+    except (TypeError, ValueError):
+        return None
+    target = anchor - timedelta(days=YEAR_GAP_DAYS)
+    best, best_delta = None, None
+    for c in candidates:
+        try:
+            d = date.fromisoformat(c["filingDate"])
+        except (TypeError, ValueError):
+            continue
+        delta = abs((d - target).days)
+        if best_delta is None or delta < best_delta:
+            best, best_delta = c, delta
+    if best is None or best_delta > YEAR_GAP_TOLERANCE_DAYS:
+        return None
+    return best
 
 
 def fetch_filing_similarity(
