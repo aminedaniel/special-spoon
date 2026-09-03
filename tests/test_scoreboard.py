@@ -70,8 +70,17 @@ def test_fixed_horizon_returns_none_before_the_window_closes():
     assert fixed_horizon_return(exact, start) is not None
 
 
-def test_fixed_horizon_handles_empty_series():
-    assert fixed_horizon_return(pd.Series(dtype="float64"), date(2026, 1, 5)) is None
+def test_fixed_horizon_handles_a_ticker_with_no_prices():
+    """The realistic empty case: a ticker present in the panel but with no
+    usable closes. dropna() leaves an empty series that still carries the
+    panel's DatetimeIndex, which is what the function must survive."""
+    empty = pd.Series(dtype="float64", index=pd.DatetimeIndex([]))
+    assert fixed_horizon_return(empty, date(2026, 1, 5)) is None
+    # All-NaN for a real date range reduces to the same case.
+    all_nan = pd.Series(
+        [np.nan] * 5, index=pd.date_range("2026-01-05", periods=5, freq="D")
+    )
+    assert fixed_horizon_return(all_nan, date(2026, 1, 5)) is None
 
 
 def test_grade_computes_alpha_and_hit_rate():
