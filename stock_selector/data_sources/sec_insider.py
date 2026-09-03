@@ -14,7 +14,30 @@ naive net-dollar sum:
   rather than allowed to cancel real buys one-for-one;
 - officer buys (the people running the company) beat outsider-director buys;
 - *cluster* buys — several distinct insiders buying in the same window —
-  are the strongest single configuration in the literature.
+  are the strongest single configuration in the literature;
+- trades made under a pre-arranged Rule 10b5-1 plan carry no information and
+  are excluded from the score entirely (see below).
+
+Cohen, Malloy & Pomorski (2012), "Decoding Inside Information", found that
+insiders trading on a routine schedule have no predictive power, and that
+removing them leaves the discretionary traders holding nearly all the signal.
+They had to INFER routineness from timing — same calendar month for three
+consecutive years — because in 2012 nothing was disclosed. Since April 2023
+Form 4 carries a mandatory Rule 10b5-1(c) indicator, which is that fact stated
+outright, in a document this module already fetches.
+
+Both routes were measured against live filings before choosing
+(scripts/diagnose_insider_plans.py, 824 Form 4s over five issuers):
+
+  aff10b5One            present in 824/824 documents, set true in 385 (47%)
+  CMP timing proxy      only 6 of 53 owners classifiable as routine over 3y
+
+So the disclosed flag wins on every axis: it covers every filing rather than a
+tenth of the owners, it needs no multi-year history (which would cost roughly
+10x the requests the weekly run makes today), and it is a stated fact rather
+than an inference. Planned trades are dropped from `signal_dollars` and from
+the distinct-buyer cluster count, but stay in the raw buy/sell/net totals so
+the honest numbers still reconcile.
 """
 
 from __future__ import annotations
@@ -43,6 +66,11 @@ SELL_DISCOUNT = 0.25          # sales are mostly noise; don't let them cancel bu
 CLUSTER_STEP = 0.25           # per extra distinct buyer beyond the first
 CLUSTER_CAP_BUYERS = 5        # multiplier saturates at 2.0 (five distinct buyers)
 
+# Rule 10b5-1(c) indicator, mandatory on Form 4 since April 2023. Measured at
+# 47% of live filings, so this excludes roughly half the transactions from the
+# score — which is the point: they were decided months before they executed.
+PLAN_FLAG_PATH = ".//aff10b5One"
+
 
 def _flag(root: ET.Element, path: str) -> bool:
     v = (root.findtext(path) or "").strip().lower()
@@ -54,7 +82,10 @@ def parse_form4(xml_text: str) -> dict:
 
     Only transaction codes P (open-market purchase) and S (open-market sale)
     count — awards, option exercises, tax withholding, and gifts are excluded.
-    Returns {buy, sell, owner_cik, is_officer, is_director}.
+    Returns {buy, sell, owner_cik, is_officer, is_director, is_planned}.
+
+    `is_planned` is the Form 4 Rule 10b5-1(c) checkbox. Live filings encode it
+    as both "1"/"0" and "true"/"false"; _flag handles both.
     """
     buy = sell = 0.0
     root = ET.fromstring(xml_text)
@@ -86,6 +117,7 @@ def parse_form4(xml_text: str) -> dict:
         "owner_cik": owner_cik,
         "is_officer": is_officer,
         "is_director": is_director,
+        "is_planned": _flag(root, PLAN_FLAG_PATH),
     }
 
 
@@ -120,6 +152,9 @@ def fetch_form4_history(
         record = {
             "buy": 0.0, "sell": 0.0,
             "owner_cik": None, "is_officer": False, "is_director": False,
+            # An unparseable filing is not evidence of a plan; never let a
+            # fetch failure silently discard a real discretionary trade.
+            "is_planned": False,
         }
         if f["primaryDocument"].endswith(".xml"):
             try:
@@ -144,37 +179,55 @@ def window_activity(
 ) -> dict | None:
     """Aggregate a Form 4 history over (as_of - lookback, as_of].
 
-    `signal_dollars` is what the signal ranks: officer buys weighted
-    OFFICER_BUY_WEIGHT, other buys BASE_BUY_WEIGHT, the total scaled up when
-    several *distinct* insiders bought (cluster effect, capped at 2x), minus
-    sells discounted to SELL_DISCOUNT so routine selling can't cancel a real
-    buy cluster one-for-one. `net_dollars` (unweighted buys - sells) is kept
-    for honest reporting alongside the shaped score.
+    `signal_dollars` is what the signal ranks, and it is built from
+    DISCRETIONARY trades only: officer buys weighted OFFICER_BUY_WEIGHT, other
+    buys BASE_BUY_WEIGHT, the total scaled up when several *distinct* insiders
+    bought (cluster effect, capped at 2x), minus sells discounted to
+    SELL_DISCOUNT so ordinary selling can't cancel a real buy cluster
+    one-for-one.
+
+    Trades executed under a pre-arranged Rule 10b5-1 plan are excluded from the
+    score and from the cluster count: they were decided months before they
+    executed, so they say nothing about what the insider believes today. Note
+    the sign consequence — dropping planned SELLS raises the score for issuers
+    whose insiders sell on schedule. That is the intended correction, not a
+    side effect: a scheduled sale is not evidence of anything.
+
+    The raw totals (`buy_dollars`, `sell_dollars`, `net_dollars`) still count
+    every trade, planned or not, so the honest numbers reconcile against EDGAR.
+    `planned_filings` reports how much of the window was excluded.
     """
     if history is None:
         return None
     start = as_of - timedelta(days=lookback_days)
     in_window = [r for r in history if start < r["date"] <= as_of]
+    # .get(): records predating the 10b5-1 flag, and those from filings that
+    # failed to parse, are treated as discretionary rather than dropped.
+    discretionary = [r for r in in_window if not r.get("is_planned", False)]
 
     buy_total = sum(r["buy"] for r in in_window)
     sell_total = sum(r["sell"] for r in in_window)
+    discretionary_sells = sum(r["sell"] for r in discretionary)
     weighted_buys = sum(
         r["buy"] * (OFFICER_BUY_WEIGHT if r["is_officer"] else BASE_BUY_WEIGHT)
-        for r in in_window
+        for r in discretionary
     )
     buyers = {
-        r["owner_cik"] for r in in_window if r["buy"] > 0 and r["owner_cik"]
+        r["owner_cik"] for r in discretionary if r["buy"] > 0 and r["owner_cik"]
     }
     cluster_mult = 1.0 + CLUSTER_STEP * min(
         max(len(buyers) - 1, 0), CLUSTER_CAP_BUYERS - 1
     )
     return {
-        "signal_dollars": weighted_buys * cluster_mult - SELL_DISCOUNT * sell_total,
+        "signal_dollars": (
+            weighted_buys * cluster_mult - SELL_DISCOUNT * discretionary_sells
+        ),
         "net_dollars": buy_total - sell_total,
         "buy_dollars": buy_total,
         "sell_dollars": sell_total,
         "distinct_buyers": len(buyers),
         "filings": len(in_window),
+        "planned_filings": len(in_window) - len(discretionary),
     }
 
 
