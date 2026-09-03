@@ -1,0 +1,42 @@
+name: Diagnose Insider Window
+
+# Manual only. After #39 excluded 10b5-1 planned trades, 33 of 63 tickers tied
+# at zero and only 2 scored positive. This measures whether a longer window
+# recovers the buying signal, or whether these insiders simply do not buy on the
+# open market at any horizon — the two explanations imply opposite actions.
+# Writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many universe tickers to sample"
+        type: string
+        default: "40"
+      windows:
+        description: "Comma-separated window lengths in days"
+        type: string
+        default: "90,180,365"
+      max_filings:
+        description: "Form 4 cap per ticker (too small silently biases coverage — see #24)"
+        type: string
+        default: "400"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Measure discretionary insider activity by window length
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: |
+          python scripts/diagnose_insider_window.py \
+            --limit "${{ inputs.limit }}" \
+            --windows "${{ inputs.windows }}" \
+            --max-filings "${{ inputs.max_filings }}"
