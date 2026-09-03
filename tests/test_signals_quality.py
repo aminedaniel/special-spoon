@@ -35,3 +35,13 @@ def test_quality_no_longer_absorbs_share_data():
     assert score(f).notna().all()
     with pytest.raises(TypeError):
         score(f, pd.Series({"CASH": -0.03, "PAPER": 0.10}))  # no longer accepted
+
+
+def test_accrual_gap_ranks_across_the_fixture_universe(fundamentals):
+    """Regression guard for the fixture defect this split exposed: ocf and ni
+    were both flat multiples of cap, so the gap was 0.02 for every ticker and
+    quality could not rank anything. Dilution hid it until issuance moved out."""
+    s = score(fundamentals)
+    assert s.nunique() == len(s), "accrual gap must not be a constant column"
+    # DDDD books more earnings than cash (negative gap) and must rank last.
+    assert s.idxmin() == "DDDD"

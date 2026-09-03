@@ -37,8 +37,13 @@ def make_fundamentals(tickers: list[str] = TICKERS) -> pd.DataFrame:
             "dividendYield": 0.0,
             "returnOnEquity": roe,
             "grossMargins": 0.6,
-            "operatingCashflow": cap * 0.05,
-            "netIncomeToCommon": cap * 0.03,
+            # Per-ticker accrual gap. These were both flat multiples of cap,
+            # so (ocf - ni)/cap was exactly 0.02 for every ticker — a constant
+            # column that could not rank anything. Dilution used to mask it
+            # inside `quality`; once issuance was split out the degenerate
+            # guard caught it immediately.
+            "operatingCashflow": cap * ocf_r,
+            "netIncomeToCommon": cap * ni_r,
             "priceToSalesTrailing12Months": ps,
             "enterpriseToRevenue": ps * 0.95,
             "enterpriseToEbitda": ps * 4,
@@ -50,12 +55,17 @@ def make_fundamentals(tickers: list[str] = TICKERS) -> pd.DataFrame:
             "sector": "Technology",
             "shortName": f"{t} Corp",
         }
-        for t, cap, pe, growth, dte, roe, ps, peg, short_pct, short_now, short_prior in [
-            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25, 4.0, 1.2, 0.02, 1e6, 1.2e6),
-            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15, 8.0, 2.0, 0.06, 3e6, 2.8e6),
-            ("CCCC", 8e8, None, 0.60, 10.0, -0.05, 3.0, 1.0, 0.12, 5e6, 4e6),   # unprofitable grower
-            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10, 12.0, 3.5, 0.25, 9e6, 5e6),
-            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08, 1.5, None, None, None, None),  # cheap, no PEG/short data
+        for (
+            t, cap, pe, growth, dte, roe, ps, peg,
+            short_pct, short_now, short_prior, ocf_r, ni_r,
+        ) in [
+            # ocf_r / ni_r give each ticker a distinct accrual gap:
+            # AAAA +3.0%, BBBB +1.5%, CCCC +0.5%, DDDD -0.5%, EEEE +2.0%
+            ("AAAA", 2e9, 25.0, 0.40, 20.0, 0.25, 4.0, 1.2, 0.02, 1e6, 1.2e6, 0.060, 0.030),
+            ("BBBB", 5e9, 35.0, 0.25, 50.0, 0.15, 8.0, 2.0, 0.06, 3e6, 2.8e6, 0.050, 0.035),
+            ("CCCC", 8e8, None, 0.60, 10.0, -0.05, 3.0, 1.0, 0.12, 5e6, 4e6, 0.015, 0.010),   # unprofitable grower
+            ("DDDD", 9e9, 55.0, 0.10, 120.0, 0.10, 12.0, 3.5, 0.25, 9e6, 5e6, 0.020, 0.025),  # paper earnings
+            ("EEEE", 4e8, 12.0, -0.05, 80.0, 0.08, 1.5, None, None, None, None, 0.040, 0.020),  # cheap, no PEG/short data
         ]
     }
     df = pd.DataFrame.from_dict(rows, orient="index")
