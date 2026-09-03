@@ -1,0 +1,35 @@
+name: Diagnose Share Count
+
+# Manual only. fetch_share_change scores dilution over RAW share counts with no
+# split adjustment, so a 2:1 split reads as +100% dilution (worst rank) and a
+# reverse split as a huge buyback (best rank). This measures the live damage and
+# establishes whether the index is dated by period end or filing date, which
+# decides the reporting lag needed to backtest issuance. Writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many universe tickers to sample"
+        type: string
+        default: "40"
+      years:
+        description: "Years of share history to pull"
+        type: string
+        default: "4"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Inspect share-count history and split handling
+        run: |
+          python scripts/diagnose_share_change.py \
+            --limit "${{ inputs.limit }}" \
+            --years "${{ inputs.years }}"
