@@ -10,8 +10,9 @@ Both share `fetch_form4_history`, which parses each Form 4 XML exactly once.
 Scoring follows what the insider-trading literature actually finds, not the
 naive net-dollar sum:
 - purchases are informative; sales are mostly noise (diversification,
-  liquidity, scheduled 10b5-1 plans), so sells are heavily discounted
-  rather than allowed to cancel real buys one-for-one;
+  liquidity, scheduled 10b5-1 plans), so buying and selling are ranked
+  separately and buying carries the larger share — netting them in dollars
+  let selling drown the signal entirely (see window_activity);
 - officer buys (the people running the company) beat outsider-director buys;
 - *cluster* buys — several distinct insiders buying in the same window —
   are the strongest single configuration in the literature;
@@ -62,7 +63,6 @@ MAX_HISTORY_FILINGS = 80      # backtest bound (years of Form 4s for a small cap
 
 OFFICER_BUY_WEIGHT = 2.0      # buys by the people running the company
 BASE_BUY_WEIGHT = 1.0         # directors / 10% owners
-SELL_DISCOUNT = 0.25          # sales are mostly noise; don't let them cancel buys 1:1
 CLUSTER_STEP = 0.25           # per extra distinct buyer beyond the first
 CLUSTER_CAP_BUYERS = 5        # multiplier saturates at 2.0 (five distinct buyers)
 
@@ -179,12 +179,24 @@ def window_activity(
 ) -> dict | None:
     """Aggregate a Form 4 history over (as_of - lookback, as_of].
 
-    `signal_dollars` is what the signal ranks, and it is built from
-    DISCRETIONARY trades only: officer buys weighted OFFICER_BUY_WEIGHT, other
-    buys BASE_BUY_WEIGHT, the total scaled up when several *distinct* insiders
-    bought (cluster effect, capped at 2x), minus sells discounted to
-    SELL_DISCOUNT so ordinary selling can't cancel a real buy cluster
-    one-for-one.
+    Returns buying and selling as SEPARATE quantities rather than one netted
+    dollar figure, because they cannot be compared in dollars.
+
+    Measured over 38 tickers and a year (scripts/diagnose_insider_window.py):
+    insiders bought $3.9M and sold $4.5B — a ratio of about 1,145 to 1. The old
+    `signal_dollars` subtracted 0.25 x sells from weighted buys in raw dollars,
+    so even at a quarter weight the sell term was roughly two orders of
+    magnitude larger in aggregate. The ranking it produced was arithmetically
+    "minus discretionary sells", with the buy signal as imperceptible noise on
+    top. The component the literature actually supports could not influence the
+    result at any window length.
+
+    So the split is the fix: `buy_conviction` (officer buys weighted
+    OFFICER_BUY_WEIGHT, others BASE_BUY_WEIGHT, scaled by the cluster
+    multiplier when several *distinct* insiders bought) and `sell_pressure`
+    (discretionary sell dollars) travel separately, and signals/insider.py
+    percentile-ranks each before combining. Percentile ranks are 0-100 by
+    construction, so no dollar magnitude can dominate the other component.
 
     Trades executed under a pre-arranged Rule 10b5-1 plan are excluded from the
     score and from the cluster count: they were decided months before they
@@ -219,9 +231,9 @@ def window_activity(
         max(len(buyers) - 1, 0), CLUSTER_CAP_BUYERS - 1
     )
     return {
-        "signal_dollars": (
-            weighted_buys * cluster_mult - SELL_DISCOUNT * discretionary_sells
-        ),
+        # Ranked separately by signals/insider.py — see the docstring above.
+        "buy_conviction": weighted_buys * cluster_mult,
+        "sell_pressure": discretionary_sells,
         "net_dollars": buy_total - sell_total,
         "buy_dollars": buy_total,
         "sell_dollars": sell_total,
