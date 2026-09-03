@@ -15,7 +15,7 @@ them by a weighted composite of:
 | Quality (accrual gap, share dilution) | 0.09 | Yahoo Finance financial fields + share history |
 | Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.07 | Yahoo Finance via `yfinance` |
 | Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
-| Filing-language stability ("lazy prices") | 0.08 | SEC EDGAR 10-Q/10-K text diff |
+| Filing-language stability ("lazy prices", year-over-year) | 0.08 | SEC EDGAR 10-Q/10-K text diff |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
 Weights are *base* weights: once enough graded history accumulates, the scoreboard

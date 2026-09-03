@@ -74,21 +74,59 @@ def test_event_points_ignores_out_of_window_and_future():
     assert event_points(filings, AS_OF) == 0.0
 
 
-def test_latest_report_pair_prefers_consecutive_10qs():
+def test_latest_report_pair_matches_same_quarter_year_over_year():
+    """Lazy Prices compares like quarter to like quarter. The adjacent quarter
+    is the trap: it scores seasonal boilerplate as a rewrite."""
     filings = [
-        _f("10-Q", "2026-05-01", accession="q2"),
-        _f("10-K", "2026-02-15", accession="k1"),
-        _f("10-Q", "2026-02-01", accession="q1"),
+        _f("10-Q", "2026-05-01", accession="q2_2026"),
+        _f("10-Q", "2026-02-01", accession="q1_2026"),   # adjacent — must NOT win
+        _f("10-Q", "2025-11-01", accession="q3_2025"),
+        _f("10-Q", "2025-05-05", accession="q2_2025"),   # ~361 days back
     ]
     pair = latest_report_pair(filings, AS_OF)
-    assert (pair[0]["accessionNumber"], pair[1]["accessionNumber"]) == ("q2", "q1")
+    assert (pair[0]["accessionNumber"], pair[1]["accessionNumber"]) == (
+        "q2_2026", "q2_2025",
+    )
+
+
+def test_latest_report_pair_rejects_six_month_gap_across_the_10k():
+    """The worst case of the old behaviour: Q4 is reported in the 10-K, so a
+    Q1 filing's 'previous' 10-Q was the prior year's Q3 — six months back,
+    across the annual language refresh. With no year-ago partner present the
+    signal must be unavailable rather than wrong."""
+    filings = [
+        _f("10-Q", "2026-05-01", accession="q1_fy27"),
+        _f("10-Q", "2025-11-01", accession="q3_fy26"),   # 181 days — out of band
+    ]
+    assert latest_report_pair(filings, AS_OF) is None
+
+
+def test_latest_report_pair_tolerates_filing_date_drift():
+    """Issuers do not file on the same calendar day every year; the band takes
+    the nearest candidate rather than counting positions back."""
+    filings = [
+        _f("10-Q", "2026-05-01", accession="new"),
+        _f("10-Q", "2025-06-10", accession="drifted"),   # 325 days — inside band
+    ]
+    pair = latest_report_pair(filings, AS_OF)
+    assert pair[1]["accessionNumber"] == "drifted"
+
+
+def test_latest_report_pair_falls_back_to_consecutive_10ks():
+    """Consecutive 10-Ks are already a year apart, so that path stays."""
+    filings = [
+        _f("10-K", "2026-02-15", accession="k2"),
+        _f("10-K", "2025-02-20", accession="k1"),
+    ]
+    pair = latest_report_pair(filings, AS_OF)
+    assert (pair[0]["accessionNumber"], pair[1]["accessionNumber"]) == ("k2", "k1")
 
 
 def test_latest_report_pair_respects_as_of():
     filings = [
         _f("10-Q", "2026-08-01", accession="future"),
         _f("10-Q", "2026-05-01", accession="q2"),
-        _f("10-Q", "2026-02-01", accession="q1"),
+        _f("10-Q", "2025-05-01", accession="q2_prior"),
     ]
     pair = latest_report_pair(filings, AS_OF)
     assert pair[0]["accessionNumber"] == "q2"  # future filing invisible
