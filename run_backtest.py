@@ -16,14 +16,17 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from stock_selector.backtest import (
+    SHARE_REPORTING_LAG_DAYS,
     BENCHMARKS,
     collect_earnings_histories,
     collect_edgar_histories,
+    collect_share_histories,
     form4_cap_for_window,
     render_markdown,
     run_backtest,
 )
 from stock_selector.config import DEFAULT_UNIVERSE_PATH, load_config
+from stock_selector.data_sources import market_data
 from stock_selector.data_sources.edgar import EdgarClient
 
 
@@ -107,8 +110,15 @@ def main(argv: list[str] | None = None) -> int:
             "will not be scored (technical/stability/earnings-drift still run)"
         )
     # Attach after the EDGAR branch: that call builds a fresh dict and would
-    # otherwise silently drop the earnings histories.
+    # otherwise silently drop these.
     histories["earnings"] = collect_earnings_histories(universe)
+    # Share counts need a full lookback BEFORE the first rebalance, plus the
+    # reporting lag, or early periods score on a truncated window.
+    histories["shares"] = collect_share_histories(
+        universe,
+        args.start
+        - timedelta(days=SHARE_REPORTING_LAG_DAYS + market_data.SHARE_LOOKBACK_DAYS + 60),
+    )
 
     result = run_backtest(
         universe=universe,
