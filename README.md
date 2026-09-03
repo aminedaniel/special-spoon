@@ -18,9 +18,9 @@ them by a weighted composite of:
 | Filing-language stability ("lazy prices", year-over-year) | 0.08 | SEC EDGAR 10-Q/10-K text diff |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
-Weights are *base* weights: once enough graded history accumulates, the scoreboard
-tilts them toward signals with demonstrated predictive power (see "Adaptive
-reweighting" below).
+These weights are what the weekly run uses, full stop. The IC-tilting feedback
+loop that used to override them is **disabled** — see "Adaptive reweighting"
+below for the measurement that killed it.
 
 No weight here is validated on this universe. A 53-period walk-forward backtest
 (2022-07 → 2026-07, non-overlapping forward returns) found **every backtestable
@@ -146,17 +146,48 @@ vs QQQ and IWM, with per-report alpha and hit rate. Results land in
 is the evidence for tuning `config/weights.yaml`. Run manually with
 `python run_scoreboard.py --reports-dir reports`.
 
-### Adaptive reweighting
+### Adaptive reweighting — disabled, and why
 
-The scoreboard also computes each signal's **information coefficient** (IC — the
-rank correlation between the signal's scores and the returns that actually
-followed) per graded report, saved to `reports/signal_ic.csv`. Once at least 6
-graded reports exist, it writes `reports/adaptive_weights.yaml`: base weights
-tilted toward signals with sustained positive IC. Guardrails keep it honest —
-measured IC is shrunk 50% toward zero, the tilt is capped at ±50% of base weight,
-and no signal can fall below 25% of its base weight (a cold streak never kills a
-signal's chance to recover). The next weekly run picks up the adapted weights
-automatically (`--no-adaptive` opts out).
+The scoreboard still computes each signal's **information coefficient** (IC — the
+rank correlation between a signal's scores and the returns that followed) into
+`reports/signal_ic.csv`. It no longer feeds those numbers back into live weights.
+
+The loop was measuring something that could not support the conclusions drawn
+from it. `window_return` graded every report *to the latest close*, so all
+windows shared a right endpoint: the oldest report was scored over six weeks and
+the newest over seven days, nested rather than independent. `adapt_weights` then
+averaged them as separate draws, and `MIN_PERIODS = 6` counted six overlapping
+windows as six samples when the effective count was closer to one. Four of the
+graded reports were also 1–2 days apart, near-duplicates of each other.
+
+What that produced, live:
+
+| | measured by the feedback loop | measured by the 53-period backtest |
+|---|---|---|
+| technical IC | ≈ **−0.3** for five consecutive reports | **+0.013** (t = 0.47) |
+| resulting weight | cut to **0.036** | — |
+| insider weight | raised to **0.167** | IC +0.000 |
+
+Real cross-sectional ICs run about 0.02–0.05. Values of 0.3–0.5 are the
+signature of a broken measurement, not of a strong signal — and the loop was
+tilting live weights by up to ±50% on them. That is the same mechanism behind
+the artifact reverted in #24.
+
+Two changes:
+
+- **ICs now use a fixed 28-day forward horizon** (`IC_HORIZON_DAYS`), matching
+  the backtest's default `step_weeks=4`, and reports too recent for that window
+  to have elapsed are skipped rather than graded over a short one. Windows are
+  now equal-length and comparable. They are **still not independent** — at weekly
+  cadence consecutive 28-day windows overlap ~75% — so the recorded ICs remain an
+  audit trail, not evidence. Only the backtest's non-overlapping loop is clean.
+- **The weekly run uses `config/weights.yaml` only.** `reports/adaptive_weights.yaml`
+  is no longer generated, and `run_weekly_report.py` ignores it unless passed
+  `--adaptive` explicitly (previously it was applied by default, with
+  `--no-adaptive` to opt out).
+
+`backtest.py` still drives `adapt_weights` walk-forward, where it is fed
+genuinely non-overlapping windows and the guardrails mean what they claim.
 
 ### Backtesting
 

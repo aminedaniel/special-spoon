@@ -28,6 +28,11 @@ MIN_PERIODS = 6       # graded reports required before any tilting
 SHRINKAGE = 0.5       # halve measured IC before applying (regression to mean)
 IC_SCALE = 0.10       # |IC| producing a full tilt (0.10 is a strong IC)
 MAX_TILT = 0.5        # weight multiplier bounded to [1-MAX_TILT, 1+MAX_TILT]
+# Unreachable at the default settings and kept only as a guard for callers
+# that raise MAX_TILT: tilt is already bounded below by 1 - MAX_TILT = 0.5, and
+# base*0.5 > base*0.25 always, so this max() never binds. Confirmed against the
+# live artifact, where the most-cut signals landed at exactly the MAX_TILT
+# bound, not this floor.
 FLOOR_FRAC = 0.25     # min fraction of base weight a signal can fall to
 
 

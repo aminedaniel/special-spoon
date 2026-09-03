@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, timedelta, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -37,6 +37,14 @@ def top_picks(rankings_csv: Path, top_n: int) -> list[str]:
     return df["ticker"].head(top_n).astype(str).tolist()
 
 
+# Forward horizon for the recorded ICs, matching the backtest's default
+# step_weeks=4 so the two pipelines are comparable. Note this makes windows
+# equal-length and comparable, NOT independent: at weekly report cadence
+# consecutive 28-day windows still overlap ~75%. Only the backtest's
+# non-overlapping loop is statistically clean.
+IC_HORIZON_DAYS = 28
+
+
 def load_scores(rankings_csv: Path) -> pd.DataFrame:
     """Full shortlist score_* columns indexed by ticker (for IC computation)."""
     df = pd.read_csv(rankings_csv).set_index("ticker")
@@ -44,12 +52,43 @@ def load_scores(rankings_csv: Path) -> pd.DataFrame:
 
 
 def window_return(closes: pd.Series, start: date) -> float | None:
-    """Return from first close on/after start to the latest close."""
+    """Return from first close on/after start to the LATEST close.
+
+    This is a to-date figure: every report graded with it shares the same right
+    endpoint, so the windows are nested and of unequal length. That is the
+    right question for "how have past picks done since I published them", which
+    is what the scoreboard table reports. It is the WRONG input for an
+    information coefficient — use fixed_horizon_return for that.
+    """
     s = closes.dropna()
     s = s[s.index.date >= start]
     if len(s) < 2:
         return None
     return float(s.iloc[-1] / s.iloc[0] - 1)
+
+
+def fixed_horizon_return(
+    closes: pd.Series, start: date, horizon_days: int = IC_HORIZON_DAYS
+) -> float | None:
+    """Return over exactly [start, start + horizon_days], or None if the window
+    has not closed yet.
+
+    Equal-length, non-nested windows: the property window_return lacks and the
+    one an IC needs. Mirrors backtest.window_forward_return rather than
+    inventing a second scheme; the two IC pipelines in this repo should not
+    measure different things.
+    """
+    s = closes.dropna()
+    s = s[s.index.date >= start]
+    if s.empty:
+        return None
+    end = start + timedelta(days=horizon_days)
+    held = s[s.index.date <= end]
+    # Refuse a partial window: if no close exists at or past the end date, the
+    # horizon has not elapsed and grading it would silently shorten the window.
+    if len(held) < 2 or s.index[-1].date() < end:
+        return None
+    return float(held.iloc[-1] / held.iloc[0] - 1)
 
 
 def grade(
@@ -131,8 +170,17 @@ def render_markdown(scoreboard: pd.DataFrame, as_of: date) -> str:
     if len(mean_alpha):
         lines += [
             "",
-            f"**Mean alpha vs QQQ across {len(mean_alpha)} graded reports: "
-            f"{mean_alpha.mean() * 100:+.1f}%**",
+            f"Mean alpha vs QQQ across {len(mean_alpha)} graded reports: "
+            f"{mean_alpha.mean() * 100:+.1f}%",
+            "",
+            "> This is **not** a track record. Every row above is measured from "
+            "its own report date to the same final close, so the windows are "
+            "nested, not independent, and several reports here are only days "
+            "apart. Averaging them restates one market episode N times rather "
+            "than accumulating N pieces of evidence. Treat it as a description "
+            "of what happened since publishing, not as evidence of skill — the "
+            "53-period non-overlapping backtest is the honest measurement, and "
+            "it found every signal indistinguishable from zero.",
         ]
     lines += [
         "",
@@ -148,7 +196,12 @@ def compute_ic_history(
     scores_by_date: dict[date, pd.DataFrame],
     closes: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-report per-signal IC: signal scores vs realized return-to-date."""
+    """Per-report per-signal IC against a FIXED forward horizon.
+
+    Reports too recent for the horizon to have elapsed are skipped rather than
+    graded over a short window — a partial window is not a smaller sample, it
+    is a different measurement.
+    """
     from .adaptive import signal_ic
 
     rows = []
@@ -156,12 +209,14 @@ def compute_ic_history(
         scores = scores_by_date[d]
         fwd = pd.Series(
             {
-                t: window_return(closes[t], d)
+                t: fixed_horizon_return(closes[t], d)
                 for t in scores.index
                 if t in closes.columns
             },
             dtype="float64",
         )
+        if fwd.dropna().empty:
+            continue
         ics = signal_ic(scores, fwd)
         if not ics.empty:
             rows.append(ics.rename(d.isoformat()))
@@ -171,8 +226,21 @@ def compute_ic_history(
 def write_adaptive_weights(
     ic_history: pd.DataFrame, reports_dir: Path
 ) -> Path | None:
-    """Blend base weights with trailing ICs into reports/adaptive_weights.yaml,
-    a drop-in replacement for config/weights.yaml used by the next weekly run."""
+    """Blend base weights with trailing ICs into reports/adaptive_weights.yaml.
+
+    NOT called by the weekly run any more, and the file it writes is no longer
+    picked up unless run_weekly_report.py is passed --adaptive explicitly.
+
+    Why it was disconnected: the ICs it consumes were computed to-date, so
+    every report shared a right endpoint and the windows were nested rather
+    than independent. adapt_weights then averaged them as if they were separate
+    draws, and MIN_PERIODS=6 counted six overlapping windows as six samples
+    when the effective count was closer to one. The live output was a technical
+    IC near -0.3 sustained over five consecutive reports and a weight cut to
+    0.036, against a 53-period non-overlapping backtest that put every signal
+    inside noise of zero. Kept for reference and for backtest.py, which drives
+    adapt_weights walk-forward off genuinely non-overlapping windows.
+    """
     import yaml
 
     from .adaptive import adapt_weights
@@ -233,8 +301,10 @@ def update_scoreboard(
     md_path.write_text(render_markdown(scoreboard, as_of))
     scoreboard.to_csv(reports_dir / "scoreboard.csv", index=False)
 
+    # ICs are still recorded — they are the audit trail of what each signal did
+    # — but they no longer steer live weights. write_adaptive_weights is
+    # deliberately not called here; see its docstring.
     ic_history = compute_ic_history(eligible, scores_by_date, closes)
     if not ic_history.empty:
         ic_history.to_csv(reports_dir / "signal_ic.csv")
-        write_adaptive_weights(ic_history, reports_dir)
     return md_path

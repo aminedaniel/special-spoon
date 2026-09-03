@@ -46,8 +46,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Stage A only: skip EDGAR/Trends/FRED calls",
     )
     parser.add_argument(
-        "--no-adaptive", action="store_true",
-        help="Ignore reports/adaptive_weights.yaml and use base weights",
+        "--adaptive", action="store_true",
+        help=(
+            "Opt in to IC-tilted weights from reports/adaptive_weights.yaml. "
+            "OFF by default: the recorded ICs are measured on overlapping "
+            "windows and are not a sound basis for reweighting. See README."
+        ),
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -61,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     adaptive_path = Path("reports/adaptive_weights.yaml")
     if (
         weights_path == DEFAULT_WEIGHTS_PATH
-        and not args.no_adaptive
+        and args.adaptive
         and adaptive_path.exists()
     ):
         weights_path = adaptive_path
