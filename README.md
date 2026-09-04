@@ -361,9 +361,25 @@ data source fails soft, but a run with no market data cannot rank anything.
   green light that agrees with what you were hoping for is the easiest kind to
   act on without checking.
 
-  Reinstating this needs a paid estimates feed with genuine point-in-time
-  consensus. Rating-change data alone would test Womack-style recommendation
-  effects, a weaker and different claim.
+  **financialdatasets.ai was checked as an alternative and rejected on the
+  vendor's own description**: its analyst estimates are *"generated from their
+  own internal models… probabilistic forecasts"*, tracking consensus within ~1%
+  average deviation. That disqualifies it twice. It is not the phenomenon —
+  Chan/Jegadeesh/Lakonishok is a behavioural result about real analysts revising
+  *sluggishly*, and a model matching the consensus **level** does not reproduce
+  the **revision path**, which is the signal. And its lookahead would be
+  invisible rather than bounded: a model built today emitting estimates for 2023
+  may be informed by what actually happened, and "<1% deviation" is a
+  level-accuracy claim that says nothing about contemporaneity. Synthetic
+  history that tracks realised outcomes is precisely what manufactures fake
+  alpha in a backtest — Finnhub's 403 is at least honest about the absence.
+
+  Reinstating this needs genuine point-in-time consensus. The academic standard
+  is [I/B/E/S](https://www.lseg.com/en/data-analytics/financial-data/company-data/ibes-estimates)
+  (1976 onward, as-of retrieval, via WRDS or Refinitiv) — institutional
+  licensing, disproportionate for a 99-ticker research screen. Rating-change
+  data alone would test Womack-style recommendation effects, a weaker and
+  different claim.
 - **yfinance is unofficial** — Yahoo can change endpoints; per-ticker failures are
   skipped and counted in the report header.
 - Not investment advice; it's an automated research screen.
