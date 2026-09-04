@@ -176,6 +176,81 @@ def collect_edgar_histories(
     return {"form4": form4, "filings": filings, "text_cache": {} if include_filing_text else None}
 
 
+# ---- Transaction costs ------------------------------------------------------
+# One-way cost in basis points by market-cap band: roughly half-spread plus
+# market impact for modest size. These are ESTIMATES, not measured for this
+# universe, and they are deliberately the one place a smaller-cap decision
+# turns — a flat rate would understate microcap and overstate mid-cap, which is
+# exactly the distinction that matters. Widen them if trading real size.
+COST_BANDS_BPS = [
+    (10e9, 5.0),     # >$10B    mega/large
+    (2e9, 10.0),     # $2-10B   mid
+    (300e6, 25.0),   # $300M-2B small   <- current universe floor
+    (50e6, 75.0),    # $50-300M micro
+    (0.0, 150.0),    # <$50M    nano
+]
+DEFAULT_COST_BPS = 25.0   # used when cap is unknown; the current band
+
+
+def one_way_cost_bps(market_cap: float | None) -> float:
+    """One-way trading cost for a name of this size, in basis points."""
+    if market_cap is None or market_cap != market_cap:   # None or NaN
+        return DEFAULT_COST_BPS
+    for floor, bps in COST_BANDS_BPS:
+        if market_cap >= floor:
+            return bps
+    return COST_BANDS_BPS[-1][1]
+
+
+def market_cap_asof(
+    ticker: str, as_of: date, closes: pd.DataFrame, shares: dict[str, object]
+) -> float | None:
+    """Shares outstanding x price, both as of the date — no lookahead.
+
+    Reuses the dated share history already collected for the issuance signal,
+    so cost banding does not fall back on today's market cap (which would be a
+    snapshot, and would misband any company that has since grown or shrunk).
+    """
+    series = shares.get(ticker)
+    if series is None or ticker not in closes.columns:
+        return None
+    hist = series[series.index.date <= as_of]
+    px = closes[ticker].dropna()
+    px = px[px.index.date <= as_of]
+    if hist.empty or px.empty:
+        return None
+    return float(hist.iloc[-1]) * float(px.iloc[-1])
+
+
+def rebalance_cost(
+    previous: set[str],
+    current: set[str],
+    as_of: date,
+    closes: pd.DataFrame,
+    shares: dict[str, object],
+) -> float:
+    """Cost of moving an equal-weight portfolio from `previous` to `current`,
+    as a fraction of portfolio value.
+
+    Each exited name sells 1/len(previous) of the book and each entered name
+    buys 1/len(current), so both legs are charged at that name's own band
+    rather than at a blended rate. The first rebalance has no prior holdings
+    and is charged entry only, which is correct.
+    """
+    cost = 0.0
+    if previous:
+        for t in previous - current:
+            cost += (1.0 / len(previous)) * one_way_cost_bps(
+                market_cap_asof(t, as_of, closes, shares)
+            ) / 10_000.0
+    if current:
+        for t in current - previous:
+            cost += (1.0 / len(current)) * one_way_cost_bps(
+                market_cap_asof(t, as_of, closes, shares)
+            ) / 10_000.0
+    return cost
+
+
 def collect_share_histories(tickers: list[str], since: date) -> dict[str, object]:
     """Full share-count history per ticker, fetched once and sliced per date.
 
@@ -332,6 +407,7 @@ def run_backtest(
     dates = rebalance_dates(start, end, step_weeks)
     period_rows, pick_rows, ic_rows, weight_rows = [], [], [], []
     ic_history = pd.DataFrame()
+    held: set[str] = set()          # prior holdings, for turnover costing
 
     for d in dates:
         weights = (
@@ -378,14 +454,27 @@ def run_backtest(
         }
         qqq = bench.get("QQQ")
         avg = float(fwd.mean())
+        current = set(fwd.index)
+        cost = rebalance_cost(
+            held, current, d, closes, histories.get("shares") or {}
+        )
+        turnover = (
+            len(current - held) / len(current) if current else 0.0
+        )
+        net = avg - cost
+        held = current
         period_rows.append(
             {
                 "rebalance": d.isoformat(),
                 "picks": len(fwd),
                 "avg_return": avg,
+                "turnover": turnover,
+                "cost": cost,
+                "net_return": net,
                 "qqq_return": qqq,
                 "iwm_return": bench.get("IWM"),
                 "alpha_vs_qqq": (avg - qqq) if qqq is not None else None,
+                "net_alpha_vs_qqq": (net - qqq) if qqq is not None else None,
             }
         )
         weight_rows.append(pd.Series(weights, name=d.isoformat()))
@@ -427,18 +516,46 @@ def render_markdown(result: BacktestResult, top_n: int, step_weeks: int) -> str:
     strat = (1 + p["avg_return"]).prod() - 1
     qqq = (1 + p["qqq_return"].fillna(0)).prod() - 1
     iwm = (1 + p["iwm_return"].fillna(0)).prod() - 1
+    has_cost = "net_return" in p.columns
+    net = (1 + p["net_return"]).prod() - 1 if has_cost else None
     lines += [
-        f"**Cumulative: strategy {pct(strat)} vs QQQ {pct(qqq)} / IWM {pct(iwm)} "
-        f"over {len(p)} periods.**",
+        f"**Cumulative (gross): strategy {pct(strat)} vs QQQ {pct(qqq)} / "
+        f"IWM {pct(iwm)} over {len(p)} periods.**",
+    ]
+    if has_cost:
+        drag = strat - net
+        lines += [
+            "",
+            f"**Cumulative (net of costs): {pct(net)} — trading cost drag "
+            f"{pct(drag)}, mean turnover {p['turnover'].mean():.0%}/period.**",
+            "",
+            "> Costs are charged per name at its own market-cap band "
+            "(one-way bps, both legs), using shares x price AS OF each "
+            "rebalance rather than today's market cap. The band rates are "
+            "reasoned estimates, not measured for this universe, and the "
+            "final period is not charged an exit — so this understates cost "
+            "slightly rather than overstating it.",
+        ]
+    lines += [
         "",
-        "| Rebalance | Picks | Return | QQQ | Alpha |",
-        "|---|---|---|---|---|",
+        "| Rebalance | Picks | Gross | Cost | Net | QQQ | Net alpha |"
+        if has_cost else "| Rebalance | Picks | Return | QQQ | Alpha |",
+        "|---|---|---|---|---|---|---|" if has_cost else "|---|---|---|---|---|",
     ]
     for _, row in p.iterrows():
-        lines.append(
-            f"| {row['rebalance']} | {int(row['picks'])} | {pct(row['avg_return'])} "
-            f"| {pct(row['qqq_return'])} | {pct(row['alpha_vs_qqq'])} |"
-        )
+        if has_cost:
+            lines.append(
+                f"| {row['rebalance']} | {int(row['picks'])} "
+                f"| {pct(row['avg_return'])} | {pct(row['cost'])} "
+                f"| {pct(row['net_return'])} | {pct(row['qqq_return'])} "
+                f"| {pct(row['net_alpha_vs_qqq'])} |"
+            )
+        else:
+            lines.append(
+                f"| {row['rebalance']} | {int(row['picks'])} "
+                f"| {pct(row['avg_return'])} | {pct(row['qqq_return'])} "
+                f"| {pct(row['alpha_vs_qqq'])} |"
+            )
 
     if not result.ic_history.empty:
         lines += ["", "## Signal predictive power (mean IC)", ""]
