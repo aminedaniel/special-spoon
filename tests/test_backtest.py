@@ -223,3 +223,62 @@ def test_issuance_absent_pops_its_weight_from_the_base():
 
     assert "issuance" in BACKTEST_WEIGHTS
     assert sum(BACKTEST_WEIGHTS.values()) == pytest.approx(1.0)
+
+
+def test_cost_bands_are_monotonic_in_size():
+    """Smaller companies must never be cheaper to trade. This banding is the
+    whole reason a smaller-cap universe decision can be evaluated at all."""
+    from stock_selector.backtest import one_way_cost_bps
+
+    caps = [50e9, 5e9, 800e6, 120e6, 20e6]
+    costs = [one_way_cost_bps(c) for c in caps]
+    assert costs == sorted(costs), "cost must rise as cap falls"
+    assert one_way_cost_bps(None) > 0        # unknown is charged, not free
+    assert one_way_cost_bps(float("nan")) > 0
+
+
+def test_rebalance_cost_zero_when_nothing_trades():
+    from stock_selector.backtest import rebalance_cost
+
+    held = {"A", "B", "C"}
+    empty = pd.DataFrame()
+    assert rebalance_cost(held, held, date(2026, 1, 1), empty, {}) == 0.0
+
+
+def test_rebalance_cost_rises_with_turnover():
+    from stock_selector.backtest import rebalance_cost
+
+    prev, empty, d = {f"T{i}" for i in range(10)}, pd.DataFrame(), date(2026, 1, 1)
+    seen = []
+    for k in (0, 5, 10):
+        cur = {f"T{i}" for i in range(10 - k)} | {f"X{i}" for i in range(k)}
+        seen.append(rebalance_cost(prev, cur, d, empty, {}))
+    assert seen == sorted(seen)
+    assert seen[0] == 0.0
+    # Full replacement charges both legs at the default band.
+    assert seen[-1] == pytest.approx(2 * 25.0 / 10_000)
+
+
+def test_first_rebalance_charges_entry_only():
+    """No prior holdings means nothing is sold — one leg, not two."""
+    from stock_selector.backtest import rebalance_cost
+
+    cur = {f"T{i}" for i in range(10)}
+    cost = rebalance_cost(set(), cur, date(2026, 1, 1), pd.DataFrame(), {})
+    assert cost == pytest.approx(25.0 / 10_000)
+
+
+def test_market_cap_asof_never_reads_the_future():
+    """Cost banding uses shares x price AS OF the rebalance. Using today's cap
+    would misband any company that has since grown or shrunk."""
+    from stock_selector.backtest import market_cap_asof
+
+    idx = pd.date_range("2025-01-01", periods=400, freq="D")
+    closes = pd.DataFrame({"AAAA": [10.0] * 200 + [100.0] * 200}, index=idx)
+    shares = {"AAAA": pd.Series([1e6] * 400, index=idx)}
+
+    early = market_cap_asof("AAAA", date(2025, 3, 1), closes, shares)
+    late = market_cap_asof("AAAA", date(2026, 1, 1), closes, shares)
+    assert early == pytest.approx(1e7)      # $10 x 1M — the price back then
+    assert late == pytest.approx(1e8)       # not contaminated by the later rise
+    assert market_cap_asof("NOPE", date(2026, 1, 1), closes, shares) is None
