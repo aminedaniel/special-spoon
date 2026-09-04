@@ -37,6 +37,7 @@ import os
 import sys
 import time
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -56,6 +57,17 @@ ENDPOINTS = {
 DATE_HINTS = ("date", "period", "time", "updated", "gradetime", "lastupdated")
 RATE_PAUSE = 1.1          # free tier is ~60 calls/min; stay well under
 
+# A backtest over 2022-07 -> now needs roughly 50 monthly observations. Four
+# distinct dates is not a history, and the first version of this script passed
+# a ticker on exactly that because its threshold happened to equal the record
+# count the API returns. Depth is now checked in days, not in row count.
+MIN_HISTORY_DAYS = 730
+# Quarter ends mean the field names the fiscal period an estimate is ABOUT.
+# Only a capture date supports point-in-time scoring, and the two look
+# identical to a field-name match — which is how the first run mislabelled
+# earnings-surprise as a dated series.
+QUARTER_ENDS = {(3, 31), (6, 30), (9, 30), (12, 31)}
+
 
 def get(path: str, key: str, **params) -> tuple[int, object]:
     params["token"] = key
@@ -67,6 +79,33 @@ def get(path: str, key: str, **params) -> tuple[int, object]:
         return r.status_code, r.json()
     except Exception:  # noqa: BLE001
         return r.status_code, r.text[:200]
+
+
+def date_span_days(values: list[str]) -> int:
+    """Calendar span covered by a set of date-like strings, 0 if unparseable."""
+    parsed = []
+    for v in values:
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                parsed.append(datetime.strptime(str(v)[:19], fmt).date())
+                break
+            except ValueError:
+                continue
+    return (max(parsed) - min(parsed)).days if len(parsed) >= 2 else 0
+
+
+def looks_like_fiscal_periods(values: list[str]) -> bool:
+    """True when the dates sit on calendar quarter ends — i.e. the field names
+    the period an estimate covers, not when the estimate was made."""
+    hits = tot = 0
+    for v in values:
+        try:
+            d = datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        tot += 1
+        hits += (d.month, d.day) in QUARTER_ENDS
+    return tot > 0 and hits / tot > 0.5
 
 
 def shape(payload: object) -> str:
@@ -146,13 +185,22 @@ def main() -> int:
         hits = [f for f in fields if any(h in f.lower() for h in DATE_HINTS)]
         # A dated SERIES has many distinct values in its date field; a
         # per-period snapshot has one row per fiscal period and no capture time.
-        distinct = {}
+        usable = False
         for f in hits:
-            distinct[f] = len({str(r.get(f)) for r in recs if r.get(f) is not None})
-        dated = any(v >= 4 for v in distinct.values())
-        verdict_pit[name] = dated
-        print(f"  {name:<18} date-ish fields {hits} distinct={distinct} "
-              f"-> {'DATED SERIES' if dated else 'per-period snapshot'}")
+            vals = [r[f] for r in recs if r.get(f) is not None]
+            span = date_span_days([str(v) for v in vals])
+            fiscal = looks_like_fiscal_periods([str(v) for v in vals])
+            deep = span >= MIN_HISTORY_DAYS
+            ok = deep and not fiscal
+            usable = usable or ok
+            why = (
+                "fiscal periods, not capture dates" if fiscal
+                else f"only {span}d of history, need {MIN_HISTORY_DAYS}d" if not deep
+                else "usable dated series"
+            )
+            print(f"  {name:<18} {f:<12} n={len(vals):<4} span={span:>5}d  "
+                  f"-> {why}")
+        verdict_pit[name] = usable
 
     # ---- [4] coverage across the real universe -----------------------------
     best = next((n for n in ("eps-estimate", "recommendation") if n in available),
@@ -190,7 +238,8 @@ def main() -> int:
     print("\n[5] READ THIS AS")
     pit_ok = any(verdict_pit.values())
     cov_ok = len(covered) >= 40
-    print(f"  point-in-time data available : {'YES' if pit_ok else 'NO'}")
+    print(f"  point-in-time data with {MIN_HISTORY_DAYS}d+ depth : "
+          f"{'YES' if pit_ok else 'NO'}")
     print(f"  coverage >= 40/99            : {'YES' if cov_ok else 'NO'} "
           f"({len(covered)})")
     if pit_ok and cov_ok:

@@ -335,6 +335,51 @@ data source fails soft, but a run with no market data cannot rank anything.
   long-running campaign's amendments cannot compound. **Not yet validated in the
   backtest**; it fires where it previously could not, which is a precondition for
   having predictive power, not evidence of it.
+- **Analyst estimate revisions cannot be tested here on free data** — investigated
+  and abandoned, not overlooked. The literature is strong (Chan/Jegadeesh/Lakonishok
+  1996; post-forecast revision drift; effects concentrate in *low-coverage* firms,
+  which describes this universe), so it was worth a look. The data is not there:
+
+  | Finnhub free tier | result |
+  |---|---|
+  | `eps-estimate` (numeric consensus) | **HTTP 403** — premium only |
+  | `revenue-estimate` | **HTTP 403** — premium only |
+  | `upgrade-downgrade` | **HTTP 403** — premium only |
+  | `recommendation` (rating counts) | 200, but **4 monthly rows ≈ 92 days** |
+  | `earnings-surprise` | 200, but keyed by **fiscal quarter end**, not capture date |
+
+  A 2022→2026 walk-forward needs ~50 monthly observations; 92 days is not a history.
+  And `earnings-surprise` gives the same actual-vs-estimate the `earnings_drift`
+  signal already reads from yfinance. yfinance itself is worse: 4 quarters of
+  earnings and snapshot-only estimates.
+
+  Note the first run of `scripts/diagnose_revisions.py` reported "both stop
+  conditions cleared" — **wrongly**. Its point-in-time test passed anything with
+  ≥4 distinct dates, and the API returns exactly 4, so a fiscal-period field was
+  mislabelled a dated series. The script now requires 730+ days of span and
+  rejects quarter-end-aligned dates outright. Recorded because an automated
+  green light that agrees with what you were hoping for is the easiest kind to
+  act on without checking.
+
+  **financialdatasets.ai was checked as an alternative and rejected on the
+  vendor's own description**: its analyst estimates are *"generated from their
+  own internal models… probabilistic forecasts"*, tracking consensus within ~1%
+  average deviation. That disqualifies it twice. It is not the phenomenon —
+  Chan/Jegadeesh/Lakonishok is a behavioural result about real analysts revising
+  *sluggishly*, and a model matching the consensus **level** does not reproduce
+  the **revision path**, which is the signal. And its lookahead would be
+  invisible rather than bounded: a model built today emitting estimates for 2023
+  may be informed by what actually happened, and "<1% deviation" is a
+  level-accuracy claim that says nothing about contemporaneity. Synthetic
+  history that tracks realised outcomes is precisely what manufactures fake
+  alpha in a backtest — Finnhub's 403 is at least honest about the absence.
+
+  Reinstating this needs genuine point-in-time consensus. The academic standard
+  is [I/B/E/S](https://www.lseg.com/en/data-analytics/financial-data/company-data/ibes-estimates)
+  (1976 onward, as-of retrieval, via WRDS or Refinitiv) — institutional
+  licensing, disproportionate for a 99-ticker research screen. Rating-change
+  data alone would test Womack-style recommendation effects, a weaker and
+  different claim.
 - **yfinance is unofficial** — Yahoo can change endpoints; per-ticker failures are
   skipped and counted in the report header.
 - Not investment advice; it's an automated research screen.
