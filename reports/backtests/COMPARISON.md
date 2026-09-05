@@ -217,3 +217,119 @@ they should not be described as measured. Two lessons worth keeping:
    small enough to need far more data — or a different kind of signal than
    free-tier sources provide. It does not say the screen is worthless; it says
    the screen has not been shown to beat holding QQQ.
+
+---
+
+# Cost-adjusted run (2026-09-04) — and the benchmark was wrong
+
+54 non-overlapping periods, 2022-07-01 -> 2026-09-04, top 10, 4-week rebalances.
+First run to include: the five correctness fixes (#39-#43), issuance split out
+and scored point-in-time (#46-#49), insider buy/sell ranked separately (#50),
+and transaction costs charged on turnover (#53).
+
+## The finding that changes how everything above should be read
+
+The strategy's CAPM alpha depends almost entirely on which benchmark it is
+measured against, and this repo has been using the wrong one.
+
+| Benchmark | Beta | Alpha (annualised) | t |
+|---|---|---|---|
+| **QQQ** (used everywhere above) | 1.11 | **-16.1%** | **-2.06** |
+| **IWM** | 0.99 | -4.7% | -0.48 |
+
+Against QQQ the screen shows *statistically significant negative alpha*. Against
+IWM it is indistinguishable from zero — and beta is 0.99, meaning IWM is simply
+the right risk cohort for it.
+
+QQQ is a mega-cap index. This universe is $300M-$20B. Over 2022-2026 mega-caps
+led by an enormous margin (QQQ +159.1% against IWM +84.3%), so benchmarking a
+small/mid-cap screen against QQQ charges it for not being a mega-cap fund.
+**That is a size artifact, not stock selection**, and it retroactively qualifies
+the "+145.7% vs QQQ +148.5%" headline in the four-year section above: matching
+QQQ over that window was, if anything, flattering.
+
+Correct reading: on the appropriate benchmark, this screen has no measurable
+alpha in either direction. Which is exactly what the per-signal ICs say.
+
+## Per-signal IC — 54 periods
+
+| Signal | Mean IC | t | 95% CI | % positive |
+|---|---|---|---|---|
+| issuance | +0.005 | +0.28 | [-0.033, +0.044] | 59% |
+| technical | +0.003 | +0.09 | [-0.056, +0.061] | 57% |
+| insider | +0.000 | +0.01 | [-0.039, +0.040] | 56% |
+| events | -0.004 | -0.29 | [-0.033, +0.024] | 52% |
+| earnings_drift | -0.016 | -0.82 | [-0.052, +0.021] | 43% |
+| stability | -0.017 | -0.50 | [-0.084, +0.050] | 50% |
+| filing_text | -0.030 | -1.31 | [-0.076, +0.015] | 41% |
+
+Not one signal is distinguishable from zero. Every interval straddles it, and
+the largest |t| is filing_text at -1.31.
+
+**Issuance is measured here for the first time.** It is the best-replicated
+factor in the table — it survived Hou/Xue/Zhang (2020) where roughly 65% of 452
+anomalies failed — and on this universe it is +0.005, t = +0.28. Being able to
+measure it at all required `get_shares_full`'s dated history plus a 45-day
+reporting lag; every other fundamentals-family signal remains untestable on
+snapshot data.
+
+**Insider is +0.000 after two rounds of repair** — excluding the 47% of Form 4s
+that are 10b5-1 planned trades, and separating buy conviction from sell pressure
+after the raw-dollar netting was shown to be dominated 1,145:1 by selling. The
+signal can now express insider buying, which it demonstrably could not before.
+There is simply almost none to express: roughly 2 of 63 names had any
+discretionary buying in a 90-day window.
+
+## Portfolio level, with costs
+
+| | gross | net |
+|---|---|---|
+| Cumulative (54 periods) | +39.5% | +32.9% |
+| Benchmarks | QQQ +159.1% / IWM +84.3% | |
+| Beta / alpha / t vs QQQ | 1.11 / -16.1% / -2.06 | 1.11 / -17.2% / -2.22 |
+| Beta / alpha / t vs IWM | 0.99 / -4.7% / -0.48 | 0.99 / -5.9% / -0.60 |
+| Mean turnover | — | 39%/period |
+| Cost drag | — | 6.6% cumulative (0.091%/period) |
+
+Costs are charged per name at its own market-cap band (25bps one-way at this
+universe's size), using shares x price as of each rebalance rather than today's
+market cap. Two estimates of mine were wrong and are corrected here: I predicted
+50-70% turnover and 15-20% cumulative drag. Actual: 39% and 6.6%.
+
+## The return fell from +145.7% to +39.5%. That is not evidence the fixes hurt.
+
+Same window, near-identical benchmark path, but cumulative return collapsed
+between the 53-period run above and this one. The signals changed underneath it
+— events went from near-inert to firing on 13D stakes, insider stopped
+effectively ranking on inverse selling, filing_text switched to year-over-year —
+so the picks changed substantially.
+
+It is tempting to read that as the corrections destroying performance. It is not
+readable that way. With every IC at zero, a 10-name monthly portfolio's return
+path is close to a random draw; +145.7% and +39.5% are both samples from the
+same zero-alpha distribution, and neither is evidence about signal quality. What
+*is* stable across both runs is the conclusion: no measurable edge, and no
+selection ability against the correct benchmark.
+
+The fixes should be judged on whether they made each signal measure what it
+claims to — which they did, and which is checkable — not on a return path that
+carries no information.
+
+## What this means
+
+1. **Do not reweight.** No signal met the pre-committed |t| >= 2 bar; the best
+   is +0.28. `config/weights.yaml` remains unvalidated on this universe.
+2. **Report against IWM.** `backtest.py` and `scoreboard.py` both headline alpha
+   vs QQQ. For a $300M-$20B universe that is the wrong cohort and manufactures
+   a spurious -16%/yr. Worth its own change.
+3. **Smaller caps would make this worse, not better.** More names would genuinely
+   help statistical power (IC noise scales ~1/sqrt(N); 63 -> 300 names cuts it
+   ~2.2x). But the cost bands are 75bps at $50-300M and 150bps below that,
+   against 25bps here — at the same 39% turnover, drag goes from 6.6% to roughly
+   20-40% cumulative. Paying that to better measure something that measures zero
+   is not a trade worth making.
+4. **The binding constraint is still power, not coverage.** 54 periods against
+   12 signals. Detecting IC 0.03 needs ~100 independent periods. Point-in-time
+   fundamentals would make 0.315 of the weight table testable and extend history
+   to 1990 — that is the purchase that changes what is knowable here, and it
+   adds no trading cost.
