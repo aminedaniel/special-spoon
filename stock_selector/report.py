@@ -17,6 +17,43 @@ DISCLAIMER = (
 )
 
 
+
+# Signals that are computed but no longer scored (see config/weights.yaml).
+# These are the checkable, durable outputs this tool produces well, so the
+# report leads with them rather than with a composite whose predictive power
+# measured zero over 54 periods.
+FACT_COLUMNS = {
+    "score_insider": "insider buying",
+    "score_events": "activist stake / corporate event",
+    "score_issuance": "share count",
+    "score_filing_text": "filing language",
+    "score_earnings_drift": "earnings surprise",
+}
+FACT_TOP_N = 5
+
+
+def _fact_lines(rankings: pd.DataFrame) -> list[str]:
+    """Names standing out on the unscored signals, highest first.
+
+    Deliberately reports the extremes rather than a ranking: with no measured
+    edge, "these five look unusual on this dimension, go look" is a claim the
+    data supports, and "these are the best stocks" is not.
+    """
+    out: list[str] = []
+    for col, label in FACT_COLUMNS.items():
+        if col not in rankings.columns:
+            continue
+        s = pd.to_numeric(rankings[col], errors="coerce").dropna()
+        # A near-constant column has nothing to say; do not manufacture a
+        # highlight out of everyone scoring the same.
+        if len(s) < 3 or s.nunique() < 3:
+            continue
+        top = s.nlargest(min(FACT_TOP_N, len(s)))
+        names = ", ".join(f"**{t}** ({v:.0f})" for t, v in top.items())
+        out.append(f"- **{label.capitalize()}** — strongest: {names}")
+    return out
+
+
 def _fmt_cap(cap: float | None) -> str:
     if cap is None or pd.isna(cap):
         return "—"
@@ -57,7 +94,29 @@ def render_markdown(result: PipelineResult, top_n: int, run_date: date) -> str:
         f"{result.gated_size} passed the quality gate, "
         f"{result.skipped} skipped on data errors.",
         "",
+    ]
+
+    facts = _fact_lines(result.rankings)
+    if facts:
+        lines += [
+            "## What changed",
+            "",
+            "Signals tracked but **not scored** — the specific, checkable things "
+            "worth a look. Percentile within this week's shortlist.",
+            "",
+            *facts,
+            "",
+        ]
+
+    lines += [
         f"## Top {len(r)} picks",
+        "",
+        "_Composite of four equal-weighted signals chosen on replication record "
+        "(12-1 momentum, gross profitability, net share issuance, PEAD). It has "
+        "**no measured predictive power** on this universe: a 54-period "
+        "walk-forward put every measurable signal inside noise of zero, and the "
+        "screen showed no alpha against IWM. Treat this as a research starting "
+        "point, not a recommendation._",
         "",
     ]
 

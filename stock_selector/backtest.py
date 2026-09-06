@@ -64,14 +64,17 @@ BENCHMARKS = ["QQQ", "IWM"]
 # is not quarter-end dated, but not that history is never restated.
 SHARE_REPORTING_LAG_DAYS = 45
 
-BACKTEST_WEIGHTS = {  # base weights over the point-in-time signal set
-    "technical": 0.28,
-    "insider": 0.18,
-    "earnings_drift": 0.14,
-    "events": 0.14,
-    "issuance": 0.10,
-    "stability": 0.08,
-    "filing_text": 0.08,
+# The three members of the live four-signal set that can be reconstructed
+# point-in-time, equal-weighted to match config/weights.yaml. profitability is
+# the fourth live signal but comes from yfinance snapshots, so it cannot appear
+# here without lookahead.
+#
+# This is a break from the seven-signal set used through the 54-period run of
+# 2026-09-04; results after this change are not directly comparable to it.
+BACKTEST_WEIGHTS = {
+    "technical": 1 / 3,
+    "issuance": 1 / 3,
+    "earnings_drift": 1 / 3,
 }
 STABILITY_LOOKBACK_DAYS = 365  # match the live signal's ~1y beta window
 

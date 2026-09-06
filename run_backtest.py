@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         "--start", type=date.fromisoformat, default=date.today() - timedelta(days=730)
     )
     parser.add_argument("--end", type=date.fromisoformat, default=date.today())
-    parser.add_argument("--step-weeks", type=int, default=4)
+    parser.add_argument("--step-weeks", type=int, default=13)
     parser.add_argument("--top-n", type=int, default=10)
     parser.add_argument(
         "--include-filing-text", action="store_true",
