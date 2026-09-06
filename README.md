@@ -5,23 +5,38 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Earnings drift / PEAD (standardized earnings surprise) | 0.11 | Yahoo Finance earnings dates via `yfinance` |
-| Technicals (12-1 momentum, trend, breakout, volume) | 0.09 | Yahoo Finance via `yfinance` |
-| Fundamentals (growth, debt, ROE, margins) | 0.13 | Yahoo Finance via `yfinance` |
-| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | 0.09 | Yahoo Finance statements via `yfinance` |
-| Insider activity (buys and sells ranked separately, officer-weighted cluster buys, 90d, **excl. 10b5-1 planned trades**) | 0.14 | SEC EDGAR issuer submissions + Form 4 XML |
-| Stability (low beta vs QQQ + low idiosyncratic vol) | 0.05 | Yahoo Finance via `yfinance` |
-| Short interest (% of float + MoM change — high/rising = bad) | 0.07 | Exchange short reports via `yfinance` |
-| Quality (accrual gap) | 0.045 | Yahoo Finance financial fields |
-| Net share issuance (buybacks good, stock-comp bloat bad) | 0.045 | Yahoo Finance share-count history |
-| Valuation (P/E, P/S, EV/Sales, EV/EBITDA, PEG, P/FCF — cheaper = better) | 0.07 | Yahoo Finance via `yfinance` |
-| Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | 0.08 | SEC EDGAR submissions feed |
-| Filing-language stability ("lazy prices", year-over-year) | 0.08 | SEC EDGAR 10-Q/10-K text diff |
+| Technicals (12-1 momentum) | **0.25** | Yahoo Finance via `yfinance` |
+| Profitability (GP/assets, asset growth — Novy-Marx/CMA) | **0.25** | Yahoo Finance statements via `yfinance` |
+| Net share issuance (buybacks good, stock-comp bloat bad) | **0.25** | Yahoo Finance share-count history |
+| Earnings drift / PEAD (standardized earnings surprise) | **0.25** | Yahoo Finance earnings dates via `yfinance` |
+| — *tracked but unscored, reported in "What changed":* | — | |
+| Insider activity (buys/sells ranked separately, excl. 10b5-1) | not scored | SEC EDGAR Form 4 XML |
+| Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | not scored | SEC EDGAR submissions feed |
+| Filing-language stability ("lazy prices", year-over-year) | not scored | SEC EDGAR 10-Q/10-K text diff |
+| Fundamentals, valuation, quality (accruals), short interest, stability | not scored | Yahoo Finance via `yfinance` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
-These weights are what the weekly run uses, full stop. The IC-tilting feedback
-loop that used to override them is **disabled** — see "Adaptive reweighting"
-below for the measurement that killed it.
+**Four signals, equal weight, chosen on replication record — not on their
+measured performance here.** `earnings_drift` measured −0.016 on this universe,
+second-worst of the set, and is kept anyway: picking signals by in-sample IC is
+the overfitting this structure exists to avoid, and 54 periods cannot separate
+skill from luck at that resolution. Twelve signals tested at t > 2 carries a
+~46% chance of a false positive by luck alone; Harvey/Liu/Zhu argue for t > 3.0
+for exactly this reason, and cutting the count is the honest response.
+
+None of it is validated here. A 54-period walk-forward put every measurable
+signal inside noise of zero, and the screen showed no alpha against IWM
+(beta 0.99). Of the four, only three can even be backtested — profitability
+comes from yfinance snapshots and rests on published evidence alone.
+
+**Positions are intended to be held a quarter.** The weekly report is a monitor
+that refreshes facts, not a rebalance trigger: rebalancing monthly on
+quarterly-updating inputs produced most of the 39% turnover and 6.6% cost drag
+the cost model found, in exchange for no new information.
+
+The IC-tilting feedback loop that used to override these weights is
+**disabled** — see "Adaptive reweighting" below for the measurement that killed
+it.
 
 No weight here is validated on this universe. A 53-period walk-forward backtest
 (2022-07 → 2026-07, non-overlapping forward returns) found **every backtestable

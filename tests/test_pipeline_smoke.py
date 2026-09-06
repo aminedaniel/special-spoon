@@ -15,19 +15,14 @@ FIXTURE_UNIVERSE = Path(__file__).parent / "fixtures" / "sample_universe.csv"
 
 def _config() -> Config:
     return Config(
+        # Four scored signals, equal weight — matches config/weights.yaml.
+        # Everything else is still computed and still emits a score_ column;
+        # composite_score gives an unlisted category weight 0.0.
         weights={
-            "fundamentals": 0.13,
-            "valuation": 0.07,
-            "profitability": 0.09,
-            "technical": 0.09,
-            "earnings_drift": 0.11,
-            "stability": 0.05,
-            "insider": 0.14,
-            "quality": 0.045,
-            "issuance": 0.045,
-            "short_interest": 0.07,
-            "events": 0.08,
-            "filing_text": 0.08,
+            "technical": 0.25,
+            "profitability": 0.25,
+            "issuance": 0.25,
+            "earnings_drift": 0.25,
         },
         thresholds={"min_market_cap": 1e8, "max_market_cap": 20e9, "max_pe": 60},
         top_n=3,
@@ -123,6 +118,8 @@ def test_full_run_includes_stage_b(
     assert "score_insider" in result.rankings.columns
     assert "score_events" in result.rankings.columns
     assert "score_filing_text" in result.rankings.columns
+    # Unscored categories must STILL emit their score_ column — the report's
+    # "What changed" section is built from exactly these.
     assert "score_quality" in result.rankings.columns
     assert "score_issuance" in result.rankings.columns
     events = result.rankings["score_events"]
