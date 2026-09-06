@@ -393,15 +393,19 @@ def run_backtest(
     client: EdgarClient | None = None,
 ) -> BacktestResult:
     """Pure walk-forward loop over pre-fetched data (testable offline)."""
+    # pop(key, None) rather than pop(key): the availability block must not
+    # assume BACKTEST_WEIGHTS still contains a given signal. Cutting the scored
+    # set to four broke exactly this — filing_text left the weights and the
+    # unconditional pop raised KeyError. Anything conditionally present must
+    # still be removed when unavailable, or its weight silently inflates the
+    # renormalization below.
     base = dict(BACKTEST_WEIGHTS)
     if not include_filing_text:
-        base.pop("filing_text")
+        base.pop("filing_text", None)
     if histories.get("earnings") is None:
-        base.pop("earnings_drift")
+        base.pop("earnings_drift", None)
     if not histories.get("shares"):
-        # Anything conditionally present must be popped, or its weight
-        # silently inflates the renormalization below.
-        base.pop("issuance")
+        base.pop("issuance", None)
     total = sum(base.values())
     base = {k: v / total for k, v in base.items()}
 

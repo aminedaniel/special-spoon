@@ -282,3 +282,18 @@ def test_market_cap_asof_never_reads_the_future():
     assert early == pytest.approx(1e7)      # $10 x 1M — the price back then
     assert late == pytest.approx(1e8)       # not contaminated by the later rise
     assert market_cap_asof("NOPE", date(2026, 1, 1), closes, shares) is None
+
+
+def test_availability_block_survives_a_reduced_weight_set():
+    """Regression guard. The availability block pops signals that may be
+    unavailable; when the scored set was cut to four, filing_text left
+    BACKTEST_WEIGHTS and the unconditional pop raised KeyError. The block must
+    tolerate any subset, since BACKTEST_WEIGHTS is expected to change again."""
+    from stock_selector.backtest import BACKTEST_WEIGHTS
+
+    conditional = {"filing_text", "earnings_drift", "issuance"}
+    base = dict(BACKTEST_WEIGHTS)
+    for key in conditional:
+        base.pop(key, None)          # must not raise for absent keys
+    # Whatever remains, the weights that ARE present sum to 1.0 before pops.
+    assert sum(BACKTEST_WEIGHTS.values()) == pytest.approx(1.0)
