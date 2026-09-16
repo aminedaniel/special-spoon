@@ -18,6 +18,13 @@ the live 99-ticker universe, 4210 stake filings):
    found NONE in window across all 93 resolved tickers, and 90% of the universe
    scored exactly 0.0. The signal was seasonally blind for most of the year.
 
+   Widening fixed the blindness but not the sparsity: in the 2026-09-14 live run
+   55 of 66 names still scored 0.0, and nothing scored ABOVE zero — no 13D or
+   13D/A landed in the 365-day window anywhere in the universe. In practice this
+   is a penalty-only column. Activist situations are simply rare across 99
+   small/mid-cap tech names, which is a fact about the universe rather than a
+   defect in the window.
+
 2. The 13G family is NOT scored at all, despite being 94% of stake filings
    (SC 13G/A 3011, SC 13G 948, vs SC 13D/A 205, SC 13D 46). 13G is the passive
    >5% crossing that every index fund files; over a 365-day window essentially

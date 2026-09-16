@@ -30,6 +30,34 @@ FACT_COLUMNS = {
     "score_earnings_drift": "earnings surprise",
 }
 FACT_TOP_N = 5
+# A one-name "highlight" is not a comparison, so a column has to yield at
+# least this many clear leaders to be worth a line at all.
+MIN_FACT_NAMES = 2
+
+
+def _leaders_above_ties(s: pd.Series, n: int) -> pd.Series:
+    """The highest-scoring names, stopping before any tie group too large to fit.
+
+    Percentile columns built from sparse underlying data are mostly ties. In
+    the 2026-09-14 run, 55 of 66 names shared the top `score_events` value and
+    35 of 66 shared the same `score_insider` value, because most issuers have
+    no activist filing and no insider trade in the window and therefore the
+    same raw score. `nlargest` still returns five names off such a column, but
+    which five is decided by the frame's sort order, not by the data — the
+    report was presenting an alphabetical accident as a finding.
+
+    Taking a tie group only when it fits entirely inside the list makes the
+    cut-off a property of the data. A column whose top value is a 55-way tie
+    yields nothing; one with two clear leaders above a large tie yields exactly
+    those two.
+    """
+    kept: list = []
+    for value in sorted(s.unique(), reverse=True):
+        group = s[s == value]
+        if len(kept) + len(group) > n:
+            break
+        kept.extend(group.index)
+    return s.loc[kept]
 
 
 def _fact_lines(rankings: pd.DataFrame) -> list[str]:
@@ -48,7 +76,9 @@ def _fact_lines(rankings: pd.DataFrame) -> list[str]:
         # highlight out of everyone scoring the same.
         if len(s) < 3 or s.nunique() < 3:
             continue
-        top = s.nlargest(min(FACT_TOP_N, len(s)))
+        top = _leaders_above_ties(s, min(FACT_TOP_N, len(s)))
+        if len(top) < MIN_FACT_NAMES:
+            continue
         names = ", ".join(f"**{t}** ({v:.0f})" for t, v in top.items())
         out.append(f"- **{label.capitalize()}** — strongest: {names}")
     return out
