@@ -14,6 +14,7 @@ them by a weighted composite of:
 | Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | not scored | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices", year-over-year) | not scored | SEC EDGAR 10-Q/10-K text diff |
 | Residual momentum (12-1 net of market beta — Blitz/Huij/Martens) | not scored | Yahoo Finance via `yfinance` |
+| Intangible-adjusted value (R&D capitalised into book — Peters-Taylor) | not scored | Yahoo Finance statements via `yfinance` |
 | Fundamentals, valuation, quality (accruals), short interest, stability | not scored | Yahoo Finance via `yfinance` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
@@ -341,6 +342,21 @@ data source fails soft, but a run with no market data cannot rank anything.
   (+0.631 vs +0.630). So the honest claim is "the same information, cleaner of market
   exposure", not "new information". Whether that distinction pays on this universe is
   what tracking it at weight 0.0 is for.
+- **Intangible-adjusted value is tracked and cannot be validated here.** GAAP
+  expenses R&D rather than capitalising it, so reported book value understates
+  research-heavy firms — which is every name in this universe, and the most likely
+  reason plain `valuation` has never looked like anything: a software firm with no
+  tangible assets reads as permanently expensive on book-to-market whether or not it
+  is. Peters-Taylor (2017) and Eisfeldt-Papanikolaou (2013) rebuild the missing
+  knowledge capital as straight-line amortised past R&D and add it to book equity.
+  Two limits worth stating plainly. It is **not backtestable** — yfinance serves
+  statement snapshots with no point-in-time history, the same wall that keeps
+  fundamentals, valuation, quality and profitability out of the walk-forward — so
+  unlike residual momentum it cannot be checked, which is a reason to be slow about
+  ever giving it weight rather than a footnote. And Yahoo's annual income statement
+  usually carries four years, not five, so the 0.2 amortisation tail is normally
+  missing; that understates knowledge capital by ~7% of a steady R&D stream, which a
+  cross-sectional percentile absorbs except where R&D growth rates differ sharply.
 - **The technical signal was 60% folklore by construction.** It averaged five
   features in equal weight: `mom_12_1` (Jegadeesh-Titman 1993), `breakout_proximity`
   (52-week high, George-Hwang 2004) — and `above_sma50`, `sma50_over_sma200` and
