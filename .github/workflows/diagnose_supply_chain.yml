@@ -1,0 +1,46 @@
+name: Diagnose Supply Chain Links
+
+# Manual only. Measures whether a Cohen-Frazzini supply-chain signal can be
+# built from free EDGAR data BEFORE any of it is written.
+#
+# Cohen & Frazzini (2008) is the strongest untried evidence here — a customer's
+# stock move predicts its supplier's over the following month. SFAS 131 requires
+# disclosure of any customer above 10% of revenue, in 10-K Item 1 and the
+# concentration-of-credit-risk note, which EDGAR serves free. The customer does
+# NOT need to be in this universe: the signal needs the customer's RETURNS, and
+# those are fetchable for any listed ticker.
+#
+# The unknown is entity resolution from prose. "Apple Inc." resolves; "one
+# customer" names nobody; "a large North American wireless carrier" resolves to
+# a guess. Two pre-committed stop conditions:
+#
+#   - under ~25 universe names with a resolved customer ticker, the column is
+#     near-constant and the degenerate guard drops it — as already happened to
+#     events (55 of 66 tied) and insider buying (35 of 66);
+#   - under 40% of 10-Ks carrying a parseable disclosure, the disclosure is not
+#     reliably extractable and the rest is moot.
+#
+# Writes nothing. Read-only against EDGAR, throttled by the shared client.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many universe tickers to scan"
+        type: string
+        default: "99"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Measure supply-chain link coverage
+        env:
+          SEC_EDGAR_USER_AGENT: ${{ secrets.SEC_EDGAR_USER_AGENT }}
+        run: python scripts/diagnose_supply_chain.py --limit "${{ inputs.limit }}"
