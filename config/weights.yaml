@@ -26,9 +26,15 @@
 # quarterly-updating inputs was most of the 39% turnover and 6.6% cost drag the
 # cost model found, bought for no new information.
 weights:
-  technical: 0.25        # 12-1 momentum. Jegadeesh-Titman 1993; confirmed
-                         # out-of-sample, internationally and cross-asset
-                         # (Asness/Moskowitz/Pedersen 2013). Strongest survivor.
+  technical: 0.25        # 12-1 momentum (Jegadeesh-Titman 1993; confirmed
+                         # out-of-sample, internationally and cross-asset by
+                         # Asness/Moskowitz/Pedersen 2013 — the strongest
+                         # survivor) AND 52-week-high proximity (George-Hwang
+                         # 2004). Two features only: above_sma50,
+                         # sma50_over_sma200 and volume_trend were removed
+                         # because they carry no cross-sectional record and,
+                         # equally weighted, put 0.15 of the composite on
+                         # folklore.
   profitability: 0.25    # GP/assets (Novy-Marx 2013) + asset growth
                          # (Cooper/Gulen/Schill 2008). Both became FF5 factors
                          # (RMW, CMA). NOT backtestable here — snapshot data.
@@ -46,7 +52,14 @@ weights:
 # (accruals: Green/Hand/Soliman 2011), or because snapshot-only data makes them
 # unbacktestable (short_interest):
 #   insider, events, filing_text, fundamentals, quality, valuation,
-#   short_interest, stability
+#   short_interest, stability, residual_momentum, intangible_value
+#
+# residual_momentum (Blitz/Huij/Martens 2011) and intangible_value
+# (Peters-Taylor 2017) are the newest two and are unscored for a further
+# reason: neither has been measured here yet. residual_momentum is
+# backtestable and will get an IC from the walk-forward; intangible_value
+# cannot be, because yfinance serves statement snapshots with no
+# point-in-time history — which is a reason to be slow about ever scoring it.
 # composite_score gives any category absent from `weights` a weight of 0.0 while
 # still emitting its score_<name> column, so nothing needs deleting to unscore.
 
