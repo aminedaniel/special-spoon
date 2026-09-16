@@ -357,6 +357,42 @@ data source fails soft, but a run with no market data cannot rank anything.
   usually carries four years, not five, so the 0.2 amortisation tail is normally
   missing; that understates knowledge capital by ~7% of a steady R&D stream, which a
   cross-sectional percentile absorbs except where R&D growth rates differ sharply.
+- **Supply-chain links: measured, and stopped.** Cohen-Frazzini (2008) is the
+  strongest evidence this project had not tried — a customer's stock move predicts
+  its supplier's over the following month, monthly alpha above 1.5% in the original
+  sample — and SFAS 131 puts the required disclosures in 10-K Item 1 and the
+  concentration-of-credit-risk note, which EDGAR serves free. (Correcting an earlier
+  claim of mine: the customer does *not* need to be in this universe. The signal
+  needs the customer's *returns*, fetchable for any listed ticker.) The constraint
+  is entity resolution from prose, so `scripts/diagnose_supply_chain.py` measured it
+  against a stop condition fixed beforehand — under 25 universe names with a
+  resolved customer link, the column is near-constant and the degenerate guard drops
+  it, as already happened to events and insider buying.
+
+  | | first run | full documents |
+  |---|---|---|
+  | 10-Ks fetched | 89 | 89 |
+  | truncated at the read cap | **89** | 0 |
+  | with a concentration disclosure | 86 (97%) | 88 (99%) |
+  | candidate names extracted | 1786 | 2926 |
+  | resolved to a ticker | 22 | 25 |
+  | **universe names with ≥1 link** | **17** | **18** |
+
+  The first run was not accepted, because `EdgarClient`'s 800k character cap
+  truncated every filing and the concentration note sits at the *back* of a 10-K —
+  a stop verdict caused by a read cap is a measurement artifact, the same mistake as
+  the 120-day events window. Reading whole documents raised candidates by 64% and
+  moved the answer by one name. **18 against a threshold of 25: stop.** Activist
+  filings are rare here and named customers are rarer.
+
+  The links that do resolve are mostly right — FORM → INTC/TSM, ICHR → LRCX/ASML,
+  DGII → ARW/AVT/INGM, SITM → AAPL — with a clear false positive in DBX → CRM/MSFT/
+  TEAM, which are competitors and partners rather than customers. The ceiling is
+  extraction, not the papers: 2926 candidates yielded 25 resolutions (0.9%), and the
+  unresolved list is dominated by table headers ("Total" 54, "Table" 48, "Cost" 38).
+  Most disclosures name nobody at all — "one customer accounted for 11% of total
+  revenue" is the common form. Reviving this needs entity extraction well beyond
+  regex over prose, not a better window.
 - **The technical signal was 60% folklore by construction.** It averaged five
   features in equal weight: `mom_12_1` (Jegadeesh-Titman 1993), `breakout_proximity`
   (52-week high, George-Hwang 2004) — and `above_sma50`, `sma50_over_sma200` and
