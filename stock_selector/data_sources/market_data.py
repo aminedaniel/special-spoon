@@ -225,8 +225,35 @@ def fetch_share_change(
     return pd.Series(out, dtype="float64").reindex(tickers)
 
 
+# yfinance statement row labels vary by filer and by yfinance version, so both
+# of these are tried in order rather than assuming one spelling. A ticker whose
+# statement carries none of them yields no value at all (NaN), never zero:
+# "this company reports no R&D" and "we could not find the row" are different
+# facts and must not collapse into the same number.
+RND_ROWS = ("Research And Development", "Research Development")
+EQUITY_ROWS = ("Stockholders Equity", "Total Stockholders Equity", "Common Stock Equity")
+
+
+def _first_row_value(frame: pd.DataFrame, names: tuple[str, ...]) -> float | None:
+    """Newest value of the first row label present, or None."""
+    for name in names:
+        if name in frame.index:
+            series = frame.loc[name].dropna()
+            if len(series) >= 1:
+                return float(series.iloc[0])
+    return None
+
+
+def _row_history(frame: pd.DataFrame, names: tuple[str, ...]) -> list[float]:
+    """Full annual series of the first row label present, newest first."""
+    for name in names:
+        if name in frame.index:
+            return [float(v) for v in frame.loc[name].dropna()]
+    return []
+
+
 def fetch_profitability_metrics(tickers: list[str]) -> pd.DataFrame:
-    """Balance-sheet factors per ticker: gross profitability and asset growth.
+    """Statement-derived factors per ticker, from ONE pass over the filings.
 
     - gp_over_assets: gross profit / total assets (Novy-Marx 2013, "the other
       side of value") — the profitability measure that survived replication
@@ -235,27 +262,41 @@ def fetch_profitability_metrics(tickers: list[str]) -> pd.DataFrame:
     - asset_growth: YoY total-asset growth (Cooper/Gulen/Schill 2008) — high
       growers underperform; it's the CMA leg of Fama-French five-factor.
 
+    Also returned, for the intangible-adjusted value signal, and read from the
+    SAME two statement objects so this costs no extra network call:
+
+    - rnd_annual: the annual R&D expense series, newest first, as a list. GAAP
+      expenses R&D rather than capitalising it, so book value understates
+      research-heavy firms; the signal rebuilds the missing asset from this.
+    - book_equity: total shareholders' equity, the figure that understatement
+      applies to.
+
     Two extra statement pulls per ticker, so shortlist-only (Stage B). NaN
     rows where statements are unavailable — the signal treats that as 'no
     information', never zero.
     """
     rows: dict[str, dict] = {}
     for i, ticker in enumerate(tickers):
-        gp = assets = assets_prev = None
+        gp = assets = assets_prev = equity = None
+        rnd: list[float] = []
         try:
             tk = yf.Ticker(ticker)
             bs = tk.balance_sheet
-            if bs is not None and not bs.empty and "Total Assets" in bs.index:
-                series = bs.loc["Total Assets"].dropna()
-                if len(series) >= 1:
-                    assets = float(series.iloc[0])
-                if len(series) >= 2:
-                    assets_prev = float(series.iloc[1])
+            if bs is not None and not bs.empty:
+                if "Total Assets" in bs.index:
+                    series = bs.loc["Total Assets"].dropna()
+                    if len(series) >= 1:
+                        assets = float(series.iloc[0])
+                    if len(series) >= 2:
+                        assets_prev = float(series.iloc[1])
+                equity = _first_row_value(bs, EQUITY_ROWS)
             inc = tk.income_stmt
-            if inc is not None and not inc.empty and "Gross Profit" in inc.index:
-                gp_series = inc.loc["Gross Profit"].dropna()
-                if len(gp_series) >= 1:
-                    gp = float(gp_series.iloc[0])
+            if inc is not None and not inc.empty:
+                if "Gross Profit" in inc.index:
+                    gp_series = inc.loc["Gross Profit"].dropna()
+                    if len(gp_series) >= 1:
+                        gp = float(gp_series.iloc[0])
+                rnd = _row_history(inc, RND_ROWS)
         except Exception as exc:  # noqa: BLE001 — per-ticker failure is non-fatal
             log.debug("statement fetch failed for %s: %s", ticker, exc)
         rows[ticker] = {
@@ -265,6 +306,8 @@ def fetch_profitability_metrics(tickers: list[str]) -> pd.DataFrame:
                 if assets is not None and assets_prev
                 else None
             ),
+            "rnd_annual": rnd,
+            "book_equity": equity,
         }
         if (i + 1) % INFO_BATCH_PAUSE_EVERY == 0:
             time.sleep(INFO_BATCH_PAUSE_SECS)

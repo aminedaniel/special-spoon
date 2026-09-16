@@ -235,3 +235,44 @@ def test_xsl_prefix_stripped_for_raw_xml(tmp_path):
     assert fetched_urls[0].endswith("/wk-form4.xml")       # xsl viewer stripped
     assert "xsl" not in fetched_urls[0]
     assert fetched_urls[1].endswith("/plain10k.htm")       # non-xsl untouched
+
+
+def test_statement_row_helpers_try_each_spelling():
+    """yfinance row labels vary by filer and by yfinance version, so both
+    spellings are tried rather than assuming one. A statement carrying neither
+    yields nothing at all, never zero."""
+    import pandas as pd
+
+    from stock_selector.data_sources.market_data import (
+        _first_row_value,
+        _row_history,
+    )
+
+    newer = pd.DataFrame(
+        {"2025": [500.0], "2024": [400.0]}, index=["Research And Development"]
+    )
+    older = pd.DataFrame(
+        {"2025": [500.0], "2024": [400.0]}, index=["Research Development"]
+    )
+    assert _row_history(newer, ("Research And Development", "Research Development")) == [
+        500.0,
+        400.0,
+    ]
+    assert _row_history(older, ("Research And Development", "Research Development")) == [
+        500.0,
+        400.0,
+    ]
+
+    absent = pd.DataFrame({"2025": [1.0]}, index=["Total Revenue"])
+    assert _row_history(absent, ("Research And Development",)) == []
+    assert _first_row_value(absent, ("Stockholders Equity",)) is None
+
+    equity = pd.DataFrame(
+        {"2025": [900.0], "2024": [800.0]}, index=["Common Stock Equity"]
+    )
+    assert (
+        _first_row_value(
+            equity, ("Stockholders Equity", "Total Stockholders Equity", "Common Stock Equity")
+        )
+        == 900.0
+    )
