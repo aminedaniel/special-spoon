@@ -29,6 +29,7 @@ from .signals import issuance as issuance_signal
 from .signals import profitability as profitability_signal
 from .signals import quality as quality_signal
 from .signals import short_interest as short_interest_signal
+from .signals import residual_momentum as residual_momentum_signal
 from .signals import stability as stability_signal
 from .signals import technical as technical_signal
 from .signals import valuation as valuation_signal
@@ -76,6 +77,11 @@ def run(config: Config, skip_stage_b: bool = False) -> PipelineResult:
         "short_interest": short_interest_signal.score(gated),
         "technical": technical_signal.score(prices).reindex(gated.index),
         "stability": stability_signal.score(prices, bench_close).reindex(gated.index),
+        # Tracked, not scored (weight 0.0): prices-only so it costs no extra
+        # fetch, and it reports an IC each week like any other signal.
+        "residual_momentum": residual_momentum_signal.score(
+            prices, bench_close
+        ).reindex(gated.index),
     }
 
     # Stage A composite decides the shortlist for expensive sources.

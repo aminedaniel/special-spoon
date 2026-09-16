@@ -53,6 +53,7 @@ from .signals import events as events_signal
 from .signals import filing_text as filing_text_signal
 from .signals import insider as insider_signal
 from .signals import issuance as issuance_signal
+from .signals import residual_momentum as residual_momentum_signal
 from .signals import stability as stability_signal
 from .signals import technical as technical_signal
 
@@ -136,6 +137,25 @@ def stability_scores_asof(
         b = bench_close.dropna()
         bench = b[(b.index.date > lo) & (b.index.date <= as_of)]
     return stability_signal.score(prices[mask], bench)
+
+
+def residual_momentum_scores_asof(
+    prices: pd.DataFrame, bench_close: pd.Series | None, as_of: date
+) -> pd.Series:
+    """Beta-adjusted 12-1 momentum as-of a date, reusing the live signal.
+
+    Trailing slice for the same reason stability_scores_asof takes one: the
+    beta is estimated on whatever window it is handed, so letting that window
+    grow with the backtest would make "beta" mean something different at later
+    rebalances than it does in the weekly run.
+    """
+    lo = as_of - timedelta(days=STABILITY_LOOKBACK_DAYS)
+    mask = (prices.index.date > lo) & (prices.index.date <= as_of)
+    bench = None
+    if bench_close is not None:
+        b = bench_close.dropna()
+        bench = b[(b.index.date > lo) & (b.index.date <= as_of)]
+    return residual_momentum_signal.score(prices[mask], bench)
 
 
 def form4_cap_for_window(since: date, end: date) -> int:
@@ -343,6 +363,9 @@ def scores_asof(
     out: dict[str, pd.Series] = {
         "technical": technical_scores_asof(prices, as_of).reindex(tickers),
         "stability": stability_scores_asof(prices, bench_close, as_of).reindex(tickers),
+        "residual_momentum": residual_momentum_scores_asof(
+            prices, bench_close, as_of
+        ).reindex(tickers),
         "insider": insider_signal.score(
             {
                 t: sec_insider.window_activity(
