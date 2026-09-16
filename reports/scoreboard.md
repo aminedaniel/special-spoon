@@ -1,22 +1,22 @@
-# Pick performance scoreboard — as of 2026-09-14
+# Pick performance scoreboard — as of 2026-09-16
 
 Equal-weighted top picks per weekly report, report date → latest close.
 
 | Report | Picks | Avg return | QQQ | IWM | Alpha vs QQQ | Hit rate |
 |---|---|---|---|---|---|---|
-| 2026-07-20 | 19 | +8.2% | +2.7% | -1.2% | +5.5% | 47% |
-| 2026-07-27 | 19 | +9.2% | +4.8% | -1.4% | +4.4% | 63% |
-| 2026-07-28 | 19 | +8.6% | +5.8% | -1.5% | +2.8% | 53% |
-| 2026-07-29 | 19 | +6.1% | +8.0% | +0.1% | -1.9% | 53% |
-| 2026-07-30 | 19 | +9.6% | +4.6% | -1.3% | +5.0% | 58% |
-| 2026-08-03 | 19 | +6.3% | +2.1% | -2.5% | +4.2% | 63% |
-| 2026-08-10 | 19 | -1.1% | -0.8% | -3.7% | -0.3% | 42% |
-| 2026-08-17 | 19 | +1.0% | -2.1% | -5.0% | +3.1% | 58% |
-| 2026-08-24 | 19 | -3.2% | +1.2% | -3.0% | -4.4% | 42% |
-| 2026-08-31 | 19 | -4.0% | -0.3% | -1.7% | -3.7% | 32% |
-| 2026-09-07 | 20 | -0.1% | -0.5% | -2.0% | +0.4% | 55% |
+| 2026-07-20 | 19 | +15.6% | +1.2% | -2.2% | +14.4% | 68% |
+| 2026-07-27 | 19 | +16.8% | +3.3% | -2.4% | +13.5% | 74% |
+| 2026-07-28 | 19 | +16.0% | +4.3% | -2.6% | +11.7% | 79% |
+| 2026-07-29 | 19 | +11.5% | +6.5% | -0.9% | +5.0% | 68% |
+| 2026-07-30 | 19 | +15.4% | +3.1% | -2.3% | +12.3% | 79% |
+| 2026-08-03 | 19 | +10.8% | +0.6% | -3.5% | +10.2% | 79% |
+| 2026-08-10 | 19 | +2.4% | -2.3% | -4.7% | +4.7% | 68% |
+| 2026-08-17 | 19 | +5.9% | -3.5% | -6.0% | +9.4% | 84% |
+| 2026-08-24 | 19 | +2.0% | -0.3% | -4.1% | +2.3% | 79% |
+| 2026-08-31 | 19 | -0.8% | -1.7% | -2.7% | +0.9% | 53% |
+| 2026-09-07 | 20 | +3.3% | -1.9% | -3.0% | +5.2% | 90% |
 
-Mean alpha vs QQQ across 11 graded reports: +1.4%
+Mean alpha vs QQQ across 11 graded reports: +8.1%
 
 > This is **not** a track record. Every row above is measured from its own report date to the same final close, so the windows are nested, not independent, and several reports here are only days apart. Averaging them restates one market episode N times rather than accumulating N pieces of evidence. Treat it as a description of what happened since publishing, not as evidence of skill — the 53-period non-overlapping backtest is the honest measurement, and it found every signal indistinguishable from zero.
 
