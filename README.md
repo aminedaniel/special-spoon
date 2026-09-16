@@ -350,6 +350,23 @@ data source fails soft, but a run with no market data cannot rank anything.
   long-running campaign's amendments cannot compound. **Not yet validated in the
   backtest**; it fires where it previously could not, which is a precondition for
   having predictive power, not evidence of it.
+
+  **Follow-up from the 2026-09-14 live run: the widened window did not make the
+  signal able to rank up.** Its whole distribution over 66 names was three values:
+
+  | events percentile | names | what it means |
+  |---|---|---|
+  | 59.09 | **55** | score 0 — nothing filed in any window |
+  | 12.88 | 6 | shelf registration and/or 8-K red flag |
+  | 4.55 | 5 | more of the same |
+
+  Nothing scored *above* the zero group, i.e. **zero SC 13D/13D-A filings landed in
+  the 365-day window across the entire universe**. So events is now a pure penalty
+  column: it can push 11 names down and cannot lift any. Removing the February
+  blindness was still correct — the window no longer excludes activist filings by
+  construction — but the honest statement is that activist situations are rare
+  enough in 99 small/mid-cap tech names that the signal is near-constant most
+  weeks. It stays computed and unscored.
 - **Analyst estimate revisions cannot be tested here on free data** — investigated
   and abandoned, not overlooked. The literature is strong (Chan/Jegadeesh/Lakonishok
   1996; post-forecast revision drift; effects concentrate in *low-coverage* firms,

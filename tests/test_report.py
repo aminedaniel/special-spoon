@@ -95,6 +95,72 @@ def test_facts_section_skips_near_constant_columns():
     assert _fact_lines(flat) == []
 
 
+def test_facts_section_drops_a_column_whose_top_value_is_a_big_tie():
+    """The 2026-09-14 run: 55 of 66 names shared the top score_events value,
+    because a 365d window found no 13D anywhere and they all scored 0. The old
+    guard passed it — three distinct values clears `nunique() < 3` — and the
+    report printed "strongest: RNG (59), PUBM (59), DBX (59), CXM (59), MANH
+    (59)", five names picked out of that tie by sort order alone."""
+    import pandas as pd
+
+    from stock_selector.report import _fact_lines
+
+    tied = pd.DataFrame(
+        {"score_events": [59.0] * 10 + [12.0, 12.0, 4.0]},
+        index=[f"T{i:02d}" for i in range(13)],
+    )
+    # Three distinct values, so the old nunique check does not catch it.
+    assert tied["score_events"].nunique() == 3
+    assert _fact_lines(tied) == []
+
+
+def test_facts_section_keeps_clear_leaders_standing_above_a_tie():
+    """score_insider in the same run: YEXT 100 and WIX 98 are real, the 35
+    names behind them at 71 are not. Report the two, drop the rest — the cut
+    comes from the data, not from the list length."""
+    import pandas as pd
+
+    from stock_selector.report import _fact_lines
+
+    rankings = pd.DataFrame(
+        {"score_insider": [100.0, 98.0] + [71.0] * 8},
+        index=["YEXT", "WIX"] + [f"T{i}" for i in range(8)],
+    )
+    line = "\n".join(_fact_lines(rankings))
+    assert "**YEXT** (100)" in line and "**WIX** (98)" in line
+    assert "(71)" not in line
+
+
+def test_facts_section_still_reports_five_when_the_column_is_clean():
+    """The truncation must not fire on ordinary well-spread columns."""
+    import pandas as pd
+
+    from stock_selector.report import _fact_lines
+
+    rankings = pd.DataFrame(
+        {"score_issuance": [100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0]},
+        index=list("ABCDEFG"),
+    )
+    line = "\n".join(_fact_lines(rankings))
+    for name, value in zip("ABCDE", (100, 90, 80, 70, 60)):
+        assert f"**{name}** ({value})" in line
+    assert "**F**" not in line and "**G**" not in line
+
+
+def test_facts_section_needs_at_least_two_leaders():
+    """One name above a wall of ties is not a comparison, so it is not a fact
+    line — it would read as a ranking of one."""
+    import pandas as pd
+
+    from stock_selector.report import _fact_lines
+
+    rankings = pd.DataFrame(
+        {"score_filing_text": [100.0] + [50.0] * 8 + [10.0]},
+        index=["LONE"] + [f"T{i}" for i in range(8)] + ["LAST"],
+    )
+    assert _fact_lines(rankings) == []
+
+
 def test_report_states_the_composite_has_no_measured_edge():
     """A ranked table implies a claim. The report must say plainly that the
     claim is not supported on this universe."""
