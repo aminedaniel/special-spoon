@@ -13,6 +13,7 @@ them by a weighted composite of:
 | Insider activity (buys/sells ranked separately, excl. 10b5-1) | not scored | SEC EDGAR Form 4 XML |
 | Corporate events (13D activist stakes, S-3 shelves, 8-K 4.02) | not scored | SEC EDGAR submissions feed |
 | Filing-language stability ("lazy prices", year-over-year) | not scored | SEC EDGAR 10-Q/10-K text diff |
+| Residual momentum (12-1 net of market beta — Blitz/Huij/Martens) | not scored | Yahoo Finance via `yfinance` |
 | Fundamentals, valuation, quality (accruals), short interest, stability | not scored | Yahoo Finance via `yfinance` |
 | Macro / Fed regime | context only | FRED (`DFF`, `T10Y2Y`, `VIXCLS`) |
 
@@ -328,6 +329,18 @@ data source fails soft, but a run with no market data cannot rank anything.
   stale in a screen that reruns weekly. Its weight was redistributed across the
   remaining eight. Reinstating it needs a *maintained* free source, which is an open
   v2 item; the code is recoverable from git history.
+- **Residual momentum is tracked, and is close to redundant with raw momentum.**
+  Blitz/Huij/Martens (2011) find momentum on beta-adjusted returns is as strong as
+  raw momentum and far less crash-prone. The version here removes only the market
+  leg (QQQ) — there is no free point-in-time factor library, so size and value
+  loadings stay in the residual, and it is an approximation of that paper rather
+  than a replication. On simulated data it did exactly what it claims — two names
+  with identical idiosyncratic paths and betas of 2.0 and 0.5 scored **identically**
+  (16.876 each) while their raw 12-1 returns were +0.895 and +0.355 — but it tracked
+  raw 12-1 momentum at rho **+0.965** and detected a known residual drift no better
+  (+0.631 vs +0.630). So the honest claim is "the same information, cleaner of market
+  exposure", not "new information". Whether that distinction pays on this universe is
+  what tracking it at weight 0.0 is for.
 - **The technical signal was 60% folklore by construction.** It averaged five
   features in equal weight: `mom_12_1` (Jegadeesh-Titman 1993), `breakout_proximity`
   (52-week high, George-Hwang 2004) — and `above_sma50`, `sma50_over_sma200` and
