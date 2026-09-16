@@ -33,6 +33,20 @@ STOP CONDITIONS, FIXED BEFORE THE RUN (the point of writing them here):
   Under ~40% of 10-Ks containing any parseable concentration disclosure, the
   disclosure itself is not reliably extractable and the rest is moot.
 
+FIRST RUN (2026-09-16, 99 tickers) AND WHY IT DOES NOT SETTLE THE QUESTION.
+The funnel returned 89 10-Ks, 86 with a disclosure (97%), 1786 candidate names,
+22 resolved, 17 universe names with a link — below the stop threshold. But ALL
+89 documents hit EdgarClient's 800k character cap, so the concentration-of-
+credit-risk note, which sits in the financial statements at the BACK of a 10-K
+and is where named customers most often appear, was cut out of every single
+filing. The 97% disclosure rate came from Item 1 and the risk factors near the
+front. 17 is therefore a floor measured on partial documents.
+
+Accepting a stop verdict produced by a read cap would be the same mistake as
+the 120-day events window and the Form 4 coverage artifact: a measurement
+artifact mistaken for a property of the data. --max-chars now defaults high
+enough to read whole filings.
+
 Writes nothing. Read-only against EDGAR, throttled by the shared client.
 
     SEC_EDGAR_USER_AGENT="..." python scripts/diagnose_supply_chain.py --limit 99
@@ -139,6 +153,14 @@ def latest_10k(client: EdgarClient, cik: int) -> dict | None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=99)
+    ap.add_argument(
+        "--max-chars",
+        type=int,
+        default=6_000_000,
+        help="Per-document read cap. The default 800k in EdgarClient truncated "
+             "ALL 89 filings on the first run, cutting the concentration note "
+             "out of every one of them.",
+    )
     ap.add_argument("--universe", default="config/universe.csv")
     args = ap.parse_args()
 
@@ -175,8 +197,13 @@ def main() -> int:
             if filing is None:
                 no_10k += 1
                 continue
-            raw = client.filing_text(cik, filing["accessionNumber"], filing["primaryDocument"])
-            if len(raw) >= 800_000:
+            raw = client.filing_text(
+                cik,
+                filing["accessionNumber"],
+                filing["primaryDocument"],
+                max_chars=args.max_chars,
+            )
+            if len(raw) >= args.max_chars:
                 truncated += 1
             text = strip_html(raw)
             fetched += 1
@@ -214,7 +241,7 @@ def main() -> int:
     print(f"      no 10-K in the feed                {no_10k}")
     print(f"      fetch failed                       {fetch_failed}")
     print(f"    10-Ks fetched                        {fetched}")
-    print(f"      hit the 800k char cap (truncated)  {truncated}")
+    print(f"      hit the {args.max_chars/1e6:.0f}M char cap (truncated)   {truncated}")
     print(f"    with a concentration disclosure      {with_disclosure}  ({rate:.0%})")
     print(f"    candidate names extracted            {sum(all_candidates.values())}")
     print(f"    names RESOLVED to a ticker           {total_links}")

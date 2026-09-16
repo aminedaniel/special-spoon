@@ -276,3 +276,21 @@ def test_statement_row_helpers_try_each_spelling():
         )
         == 900.0
     )
+
+
+def test_filing_text_cap_is_overridable():
+    """The 800k default is tuned for the lazy-prices similarity signal, which
+    only needs enough text to compare two filings. It truncated ALL 89 10-Ks in
+    the supply-chain diagnostic's first run, cutting the concentration note out
+    of every one — so a caller that needs the whole document can raise it."""
+    from unittest.mock import Mock, patch
+
+    from stock_selector.data_sources.edgar import MAX_DOC_CHARS, EdgarClient
+
+    client = EdgarClient("test agent test@example.com")
+    long_doc = "x" * (MAX_DOC_CHARS + 50_000)
+    with patch.object(client, "_get", return_value=Mock(text=long_doc)):
+        assert len(client.filing_text(1, "a-b-c", "d.htm")) == MAX_DOC_CHARS
+        assert len(
+            client.filing_text(1, "a-b-c", "d.htm", max_chars=6_000_000)
+        ) == len(long_doc)
