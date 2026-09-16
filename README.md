@@ -5,7 +5,7 @@ them by a weighted composite of:
 
 | Signal | Base weight | Source (all free) |
 |---|---|---|
-| Technicals (12-1 momentum) | **0.25** | Yahoo Finance via `yfinance` |
+| Technicals (12-1 momentum + 52-week-high proximity) | **0.25** | Yahoo Finance via `yfinance` |
 | Profitability (GP/assets, asset growth — Novy-Marx/CMA) | **0.25** | Yahoo Finance statements via `yfinance` |
 | Net share issuance (buybacks good, stock-comp bloat bad) | **0.25** | Yahoo Finance share-count history |
 | Earnings drift / PEAD (standardized earnings surprise) | **0.25** | Yahoo Finance earnings dates via `yfinance` |
@@ -328,6 +328,19 @@ data source fails soft, but a run with no market data cannot rank anything.
   stale in a screen that reruns weekly. Its weight was redistributed across the
   remaining eight. Reinstating it needs a *maintained* free source, which is an open
   v2 item; the code is recoverable from git history.
+- **The technical signal was 60% folklore by construction.** It averaged five
+  features in equal weight: `mom_12_1` (Jegadeesh-Titman 1993), `breakout_proximity`
+  (52-week high, George-Hwang 2004) — and `above_sma50`, `sma50_over_sma200` and
+  `volume_trend`, which are technical-analysis convention with no robust
+  cross-sectional record, the same objection that removed the RSI and MACD subscores
+  earlier. Equal weighting meant 3/5 of the signal, and therefore **0.15 of the whole
+  composite**, rested on the unevidenced three. This is the `quality` defect again —
+  a survivor averaged with a casualty looks mediocre until they are separated —
+  sitting inside a signal carrying 0.25. The three are gone; technical is now the two
+  documented features. The weight did not change, only what it measures. Both
+  survivors point the same way by construction (a stock near its 52-week high usually
+  has positive trailing momentum), so this is deliberately a narrow signal rather than
+  a diversified one.
 - **Corporate-events signal was seasonally blind — diagnosed and fixed.** It scored
   ~90% of the universe identically for months. The explanation carried here since #12
   ("SC 13D/13G are filed *by the holder*, so they may not appear in the issuer's own

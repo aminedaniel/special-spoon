@@ -1,22 +1,47 @@
-"""Technical signal: 12-1 momentum, trend, breakout proximity, volume trend.
+"""Technical signal: 12-1 momentum and 52-week-high proximity.
 
-Reworked around what actually replicates. Classic oscillator indicators
-(RSI, MACD) have no robust standalone edge in the cross-sectional literature;
-what does is *intermediate-term momentum measured with the most recent month
-excluded* — the 12-1 convention (Jegadeesh & Titman 1993) — because the last
-month is contaminated by short-term reversal. The old RSI sweet-spot and
-1-month momentum subscores are gone for exactly that reason.
+Two features, both with a published cross-sectional record:
+
+  mom_12_1            Jegadeesh & Titman (1993). Intermediate-term momentum
+                      measured with the most recent month excluded, because
+                      that month is contaminated by short-term reversal. The
+                      strongest surviving anomaly in the replication surveys.
+
+  breakout_proximity  George & Hwang (2004). Nearness to the 52-week high
+                      predicts returns beyond raw momentum: investors anchor
+                      on the high and underreact to news that would push a
+                      stock through it.
+
+THREE FEATURES WERE REMOVED, and the reason is worth keeping. Until now this
+signal averaged five features in equal weight: the two above plus
+`above_sma50`, `sma50_over_sma200` (golden-cross style trend flags) and
+`volume_trend`. Those three are technical-analysis folklore. They have no
+robust standalone cross-sectional edge in the literature, in the same way the
+RSI and MACD subscores removed earlier did not.
+
+Equal-weighting them with the two that do replicate meant 3/5 of this signal —
+and, since technical carries 0.25 of the composite, 0.15 of the whole score —
+rested on features with no evidence behind them. That is precisely the defect
+found in `quality`, where a survivor averaged with a casualty looked mediocre
+until the two were separated. Diluting a good signal is not conservative; it
+is a quiet bet that the folklore is as good as the finding.
+
+Both survivors point the same direction by construction (a stock near its
+52-week high generally has positive trailing momentum), so this is a
+deliberately narrow signal rather than a diversified one. That is the
+intended trade: narrow and evidenced beats broad and half-invented.
+
+No weight changed here. technical stays at 0.25; what changed is what the
+0.25 is actually measuring.
 """
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from .base import combine_subscores, percentile_score
 
 TRADING_DAYS_1M = 21
-TRADING_DAYS_3M = 63
 TRADING_DAYS_6M = 126
 TRADING_DAYS_12M = 252
 
@@ -29,35 +54,20 @@ def momentum_12_1(close: pd.Series) -> float:
     return float(close.iloc[-TRADING_DAYS_1M] / close.iloc[base_idx] - 1)
 
 
-def _per_ticker_features(close: pd.Series, volume: pd.Series) -> dict[str, float]:
+def _per_ticker_features(close: pd.Series) -> dict[str, float]:
     close = close.dropna()
     if len(close) < TRADING_DAYS_6M + 5:
         return {}
 
-    last = close.iloc[-1]
-    sma50 = close.rolling(50).mean().iloc[-1]
-    sma200 = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else np.nan
-
     feats: dict[str, float] = {}
-    # Trend: price above SMA50 and SMA50 above SMA200 (golden-cross style)
-    feats["above_sma50"] = float(last > sma50)
-    if not np.isnan(sma200):
-        feats["sma50_over_sma200"] = float(sma50 > sma200)
 
     # The momentum that replicates: 12 months, most recent month excluded.
     feats["mom_12_1"] = momentum_12_1(close)
 
-    # Breakout proximity: distance below 52-week high (closer is better)
+    # Breakout proximity: distance below the 52-week high (closer is better).
     high_52w = close.iloc[-TRADING_DAYS_12M:].max()
-    feats["breakout_proximity"] = last / high_52w - 1  # <= 0, closer to 0 is better
+    feats["breakout_proximity"] = float(close.iloc[-1] / high_52w - 1)  # <= 0
 
-    # Volume trend: recent 21d avg volume vs prior 63d avg
-    vol = volume.dropna()
-    if len(vol) >= TRADING_DAYS_3M + TRADING_DAYS_1M:
-        recent = vol.iloc[-TRADING_DAYS_1M:].mean()
-        prior = vol.iloc[-(TRADING_DAYS_3M + TRADING_DAYS_1M):-TRADING_DAYS_1M].mean()
-        if prior > 0:
-            feats["volume_trend"] = recent / prior - 1
     return feats
 
 
@@ -65,14 +75,13 @@ def score(price_history: pd.DataFrame) -> pd.Series:
     """Compute per-ticker technical features then percentile-rank each
     feature cross-sectionally and average into a 0-100 score.
 
-    `price_history` is the yfinance multi-column frame (field, ticker).
+    `price_history` is the yfinance multi-column frame (field, ticker). Only
+    the Close panel is read; volume is no longer used by any feature.
     """
     closes = price_history["Close"]
-    volumes = price_history["Volume"]
 
     feature_rows = {
-        ticker: _per_ticker_features(closes[ticker], volumes[ticker])
-        for ticker in closes.columns
+        ticker: _per_ticker_features(closes[ticker]) for ticker in closes.columns
     }
     feats = pd.DataFrame.from_dict(feature_rows, orient="index")
     if feats.empty:
