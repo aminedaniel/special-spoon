@@ -90,8 +90,17 @@ class EdgarClient:
             for i in range(n)
         ]
 
-    def filing_text(self, cik: int, accession: str, doc: str) -> str:
+    def filing_text(
+        self, cik: int, accession: str, doc: str, max_chars: int = MAX_DOC_CHARS
+    ) -> str:
         """Fetch a filing document's text (HTML included), size-capped.
+
+        `max_chars` is overridable because the default is tuned for the
+        lazy-prices similarity signal, which only needs enough text to compare
+        two filings. A caller that must see the WHOLE document — the
+        concentration-of-credit-risk note sits in the financial statements at
+        the back of a 10-K, past 800k characters in every filing measured —
+        passes a larger cap rather than silently reading a prefix.
 
         primaryDocument for Form 3/4/5 often carries an XSL-viewer prefix
         ("xslF345X05/foo.xml"); fetching that path returns the *rendered
@@ -102,4 +111,4 @@ class EdgarClient:
         if "/" in doc and doc.split("/", 1)[0].startswith("xsl"):
             doc = doc.split("/", 1)[1]
         url = FILING_URL.format(cik=cik, accession=accession.replace("-", ""), doc=doc)
-        return self._get(url).text[:MAX_DOC_CHARS]
+        return self._get(url).text[:max_chars]
